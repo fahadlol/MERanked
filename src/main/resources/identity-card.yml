@@ -1,0 +1,11 @@
+identity-card:
+  enabled: true
+  # gamemodes shown on the card (empty = all enabled)
+  shown-gamemodes: []
+  show-peak-tier: true
+  show-confidence: true
+  show-season-rank: true
+  show-win-rate: true
+  show-streak: true
+  gui-item: PLAYER_HEAD
+  title: "<gradient:#D6B36A:#7C3AED><bold><player> [<region>]</bold></gradient>"

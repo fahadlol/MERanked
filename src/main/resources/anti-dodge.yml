@@ -1,0 +1,25 @@
+enabled: true
+
+cooldowns:
+  - count: 1
+    duration-seconds: 30
+  - count: 2
+    duration-seconds: 120
+  - count: 3
+    duration-seconds: 300
+  - count: 4
+    duration-seconds: 900
+  - count: 5
+    hide-duration-seconds: 1800
+
+dodge-triggers:
+  leave-after-match-found: true
+  leave-during-voting: true
+  leave-during-cinematic: true
+  leave-during-countdown: true
+  disconnect-before-start: true
+  queue-sniping: true
+  queue-sniping-threshold: 5
+  queue-sniping-window-seconds: 60
+
+reset-dodges-after-hours: 24

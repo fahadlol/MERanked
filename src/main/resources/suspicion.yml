@@ -1,0 +1,16 @@
+enabled: true
+max-score: 100
+decay-per-day: 2
+decay-enabled: true
+
+factors:
+  same-ip-match: 15
+  repeated-opponent: 10
+  short-win: 8
+  rating-spike: 20
+  dodge: 12
+  disconnect-pattern: 10
+  illegal-kit: 25
+  flagged-match: 15
+  unusual-win-streak: 10
+  alt-behavior: 20

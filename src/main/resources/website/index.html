@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>MERanked — Gold Rift</title>
+  <link rel="stylesheet" href="/assets/style.css"/>
+</head>
+<body>
+<header>
+  <div class="logo">MERanked</div>
+  <nav>
+    <a href="#leaderboards">Leaderboards</a>
+    <a href="#live">Live</a>
+  </nav>
+</header>
+<main>
+  <section class="hero">
+    <h1>Middle East Ranked</h1>
+    <p>Gold Rift competitive tierlist — live queues, matches, and leaderboards.</p>
+    <div class="stats" id="status-cards">
+      <div class="card"><span id="online">—</span><label>Online</label></div>
+      <div class="card"><span id="matches">—</span><label>Live Matches</label></div>
+      <div class="card"><span id="season">—</span><label>Season</label></div>
+    </div>
+  </section>
+  <section id="live" class="panel">
+    <h2>Live Matches</h2>
+    <div id="live-matches" class="grid"></div>
+  </section>
+  <section id="leaderboards" class="panel">
+    <h2>Leaderboards</h2>
+    <div class="tabs" id="gamemode-tabs"></div>
+    <table>
+      <thead><tr><th>#</th><th>Player</th><th>Region</th><th>Tier</th><th>Rating</th><th>W/L</th></tr></thead>
+      <tbody id="leaderboard-body"></tbody>
+    </table>
+  </section>
+</main>
+<div id="player-modal" class="modal hidden">
+  <div class="modal-content">
+    <button class="modal-close" id="modal-close">×</button>
+    <h2 id="modal-name">Player</h2>
+    <p class="modal-region" id="modal-region"></p>
+    <div id="modal-profiles" class="grid"></div>
+    <h3>Recent Matches</h3>
+    <div id="modal-matches" class="match-list"></div>
+  </div>
+</div>
+<script src="/assets/app.js"></script>
+</body>
+</html>

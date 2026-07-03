@@ -1,0 +1,113 @@
+name: MERanked
+version: ${version}
+main: com.meranked.MERankedPlugin
+api-version: '1.21'
+authors: [MERanked]
+description: Middle East Elo/Glicko queue-based tierlist system - Gold Rift
+softdepend: [PlaceholderAPI, FastAsyncWorldEdit, WorldEdit]
+commands:
+  ranked:
+    description: Main ranked command
+    aliases: [r]
+  queue:
+    description: Queue for ranked
+  arena:
+    description: Arena management
+    permission: meranked.arena.admin
+  kiteditor:
+    description: Open kit editor
+    aliases: [editkit, kit]
+  region:
+    description: Set region tag
+  spectate:
+    description: Spectate a match
+    aliases: [spec]
+  staffspectate:
+    description: Staff silent spectate
+    aliases: [sspec]
+  replay:
+    description: View match replay
+  spawn:
+    description: Teleport to spawn
+  setspawn:
+    description: Set spawn location
+    permission: meranked.admin.setspawn
+  hub:
+    description: Teleport to hub
+    aliases: [lobby]
+  ping:
+    description: Check ping
+  msg:
+    description: Private message
+    aliases: [tell, w, whisper]
+  reply:
+    description: Reply to last message
+    aliases: [r]
+  msgtoggle:
+    description: Toggle private messages
+  socialspy:
+    description: Spy on messages
+    permission: meranked.staff.socialspy
+  discord:
+    description: Show discord link
+  rules:
+    description: Show rules
+  help:
+    description: Show help
+  matches:
+    description: List live matches
+  unspectate:
+    description: Stop spectating
+  spectateaccept:
+    description: Accept spectate request
+  spectatedeny:
+    description: Deny spectate request
+  spectatetoggle:
+    description: Toggle spectate requests (use /settings)
+  settings:
+    description: Player settings
+  spectateaccept:
+    description: Accept spectate request
+  spectatedeny:
+    description: Deny spectate request
+permissions:
+  meranked.*:
+    description: All MERanked permissions
+    default: op
+    children:
+      meranked.admin: true
+      meranked.staff: true
+      meranked.arena.admin: true
+      meranked.kit.audit: true
+      meranked.kit.view: true
+      meranked.kit.reset: true
+  meranked.admin:
+    description: Admin commands
+    default: op
+  meranked.staff:
+    description: Staff commands
+    default: op
+  meranked.arena.admin:
+    description: Arena management
+    default: op
+  meranked.kit.audit:
+    description: Audit kits
+    default: op
+  meranked.kit.view:
+    description: View player kits
+    default: op
+  meranked.kit.reset:
+    description: Reset player kits
+    default: op
+  meranked.staff.socialspy:
+    description: Social spy
+    default: op
+  meranked.staff.spectate:
+    description: Staff spectate
+    default: op
+  meranked.bypass.dodge:
+    description: Bypass dodge penalties
+    default: op
+  meranked.bypass.queue:
+    description: Bypass queue restrictions
+    default: op

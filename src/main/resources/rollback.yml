@@ -1,0 +1,13 @@
+rollback:
+  enabled: true
+  # rollback must be confirmed in a preview GUI unless run from console
+  require-confirmation: true
+  allow-console-force: true
+  log-all-rollbacks: true
+  # max matches a single rollbackplayer/rollbackgroup call can affect
+  max-batch: 10
+  affected-systems:
+    - "Leaderboard cache"
+    - "Match history"
+    - "Peak tier if needed"
+    - "Suspicion score"

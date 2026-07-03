@@ -1,0 +1,6 @@
+friend-farming:
+  enabled: true
+  max-cross-gamemode-matches-24h: 6
+  alert-severity: "HIGH"
+  window-hours: 24
+  suspicion-increase: 15

@@ -1,0 +1,21 @@
+enabled: true
+batch-events: true
+batch-interval-ms: 1000
+max-events-per-match: 500
+visual-replay-enabled: false
+store-combat-stats: true
+
+event-types:
+  - DAMAGE_DEALT
+  - HIT_LANDED
+  - CRITICAL_HIT
+  - TOTEM_POP
+  - CRYSTAL_PLACED
+  - CRYSTAL_BROKEN
+  - ANCHOR_USED
+  - OBSIDIAN_PLACED
+  - PEARL_THROWN
+  - GOLDEN_APPLE_EATEN
+  - POTION_USED
+  - DEATH
+  - DISCONNECT

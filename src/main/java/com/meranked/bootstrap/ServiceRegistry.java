@@ -1,0 +1,257 @@
+package com.meranked.bootstrap;
+
+import com.meranked.MERankedPlugin;
+import com.meranked.alerts.AlertService;
+import com.meranked.alerts.DiscordWebhookService;
+import com.meranked.api.WebsiteApiService;
+import com.meranked.arenas.ArenaRegenService;
+import com.meranked.arenas.ArenaService;
+import com.meranked.config.ConfigService;
+import com.meranked.config.MessageService;
+import com.meranked.database.DatabaseService;
+import com.meranked.database.RedisService;
+import com.meranked.gui.GuiListener;
+import com.meranked.gui.GuiManager;
+import com.meranked.kits.DefaultKitService;
+import com.meranked.kits.KitChecksumService;
+import com.meranked.kits.KitEditorService;
+import com.meranked.kits.KitService;
+import com.meranked.kits.KitValidationService;
+import com.meranked.matchmaking.MatchmakingService;
+import com.meranked.matches.CinematicService;
+import com.meranked.matches.MatchQualityService;
+import com.meranked.matches.MatchService;
+import com.meranked.placeholders.PlaceholderBridge;
+import com.meranked.queue.AntiDodgeService;
+import com.meranked.queue.QueueService;
+import com.meranked.rating.*;
+import com.meranked.redis.RedisLiveCache;
+import com.meranked.regions.RegionService;
+import com.meranked.replays.ReplayService;
+import com.meranked.scoreboard.ScoreboardService;
+import com.meranked.settings.PlayerSettingsService;
+import com.meranked.spectating.SpectateRequestService;
+import com.meranked.spectating.SpectateService;
+import com.meranked.staff.*;
+import com.meranked.utility.UtilityService;
+import com.meranked.voting.ArenaVoteService;
+
+import java.util.concurrent.CompletableFuture;
+
+public final class ServiceRegistry {
+
+    private final MERankedPlugin plugin;
+    private ConfigService configService;
+    private MessageService messageService;
+    private DatabaseService databaseService;
+    private RedisService redisService;
+
+    private TierService tierService;
+    private RatingService ratingService;
+    private ProfileService profileService;
+    private SeasonService seasonService;
+    private PlacementService placementService;
+    private PlacementScalingService placementScalingService;
+    private AntiBoostService antiBoostService;
+    private LeaderboardService leaderboardService;
+    private DecayService decayService;
+    private RankProgressService rankProgressService;
+    private UpsetService upsetService;
+
+    private QueueService queueService;
+    private AntiDodgeService antiDodgeService;
+    private MatchmakingService matchmakingService;
+    private BanService banService;
+
+    private ArenaService arenaService;
+    private ArenaRegenService arenaRegenService;
+    private ArenaVoteService arenaVoteService;
+    private CinematicService cinematicService;
+    private MatchService matchService;
+    private MatchQualityService matchQualityService;
+
+    private KitService kitService;
+    private KitChecksumService kitChecksumService;
+    private KitEditorService kitEditorService;
+    private DefaultKitService defaultKitService;
+    private KitValidationService kitValidationService;
+
+    private ScoreboardService scoreboardService;
+    private SpectateService spectateService;
+    private SpectateRequestService spectateRequestService;
+    private ReplayService replayService;
+
+    private RegionService regionService;
+    private AlertService alertService;
+    private DiscordWebhookService discordWebhookService;
+    private SuspicionService suspicionService;
+    private WatchlistService watchlistService;
+    private RollbackService rollbackService;
+    private StaffService staffService;
+    private DetectionService detectionService;
+    private AltLockService altLockService;
+
+    private PlayerSettingsService settingsService;
+    private WebsiteApiService websiteApiService;
+    private RedisLiveCache redisLiveCache;
+    private UtilityService utilityService;
+    private PlaceholderBridge placeholderBridge;
+    private GuiManager guiManager;
+
+    public ServiceRegistry(MERankedPlugin plugin) {
+        this.plugin = plugin;
+    }
+
+    public void registerCore() {
+        configService = new ConfigService(plugin);
+        messageService = new MessageService(plugin, configService);
+    }
+
+    public void loadConfigs() {
+        configService.loadAll();
+    }
+
+    public CompletableFuture<Void> initializeAsync() {
+        databaseService = new DatabaseService(plugin, configService);
+        redisService = new RedisService(plugin, configService);
+        return databaseService.initialize().thenCompose(v -> redisService.initialize());
+    }
+
+    public void registerModules() {
+        tierService = new TierService(configService);
+        ratingService = new RatingService(configService, tierService);
+        seasonService = new SeasonService(plugin, configService, databaseService);
+        profileService = new ProfileService(plugin, databaseService, configService, tierService, ratingService, seasonService);
+        placementService = new PlacementService(configService, tierService, profileService);
+        placementScalingService = new PlacementScalingService(configService);
+        placementService.bindScaling(placementScalingService);
+        antiBoostService = new AntiBoostService(configService, databaseService);
+        leaderboardService = new LeaderboardService(plugin, configService, databaseService, tierService);
+        decayService = new DecayService(plugin, configService, profileService, ratingService);
+        rankProgressService = new RankProgressService(configService, tierService);
+        upsetService = new UpsetService(plugin, configService, databaseService);
+
+        settingsService = new PlayerSettingsService(plugin, configService, databaseService);
+        banService = new BanService(plugin, databaseService);
+        antiDodgeService = new AntiDodgeService(plugin, configService, databaseService, messageService);
+        queueService = new QueueService(plugin, configService, profileService, antiDodgeService, messageService, banService, placementScalingService);
+        matchmakingService = new MatchmakingService(plugin, configService, queueService, profileService);
+
+        arenaRegenService = new ArenaRegenService(plugin, configService);
+        arenaService = new ArenaService(plugin, configService, databaseService, messageService, arenaRegenService);
+        arenaVoteService = new ArenaVoteService(plugin, configService, messageService, arenaService);
+        cinematicService = new CinematicService(plugin, configService, messageService);
+        matchQualityService = new MatchQualityService(plugin, configService, databaseService, tierService);
+        matchService = new MatchService(plugin, this);
+        matchmakingService.bindServices(this);
+
+        kitService = new KitService(plugin, configService, databaseService);
+        kitChecksumService = new KitChecksumService(plugin, this);
+        kitService.bindChecksum(kitChecksumService);
+        kitValidationService = new KitValidationService(kitService, configService);
+        defaultKitService = new DefaultKitService(plugin, configService, kitService);
+        kitEditorService = new KitEditorService(plugin, configService, kitService, messageService);
+
+        replayService = new ReplayService(plugin, configService, databaseService);
+        spectateService = new SpectateService(plugin, configService, matchService, messageService);
+        spectateRequestService = new SpectateRequestService(plugin, matchService, spectateService, settingsService, messageService);
+        scoreboardService = new ScoreboardService(plugin, configService, this);
+
+        regionService = new RegionService(plugin, configService, databaseService, messageService, profileService);
+        suspicionService = new SuspicionService(plugin, configService, databaseService);
+        alertService = new AlertService(plugin, configService, databaseService, messageService, suspicionService);
+        discordWebhookService = new DiscordWebhookService(plugin, configService);
+        watchlistService = new WatchlistService(plugin, databaseService, alertService);
+        rollbackService = new RollbackService(plugin, databaseService, profileService, matchService, alertService);
+        staffService = new StaffService(plugin, alertService, suspicionService, watchlistService, rollbackService);
+        detectionService = new DetectionService(plugin, this);
+        altLockService = new AltLockService(plugin, this);
+
+        redisLiveCache = new RedisLiveCache(plugin, redisService);
+        websiteApiService = new WebsiteApiService(plugin, configService, this);
+        utilityService = new UtilityService(plugin, configService, messageService, matchService, settingsService);
+        guiManager = new GuiManager(plugin, this);
+        placeholderBridge = new PlaceholderBridge(this);
+
+        plugin.getServer().getPluginManager().registerEvents(new GuiListener(this), plugin);
+
+        matchmakingService.start();
+        scoreboardService.start();
+        suspicionService.startDecayTask();
+        decayService.start();
+        websiteApiService.start();
+        profileService.startCacheFlushTask();
+        plugin.tasks().runAsyncTimer(this::publishLiveData, 40L, 40L);
+
+        plugin.getLogger().info("All MERanked modules registered.");
+    }
+
+    private void publishLiveData() {
+        if (!redisService.enabled()) return;
+        var queues = new java.util.HashMap<String, Integer>();
+        queueService.allQueues().forEach((k, v) -> queues.put(k, v.size()));
+        redisLiveCache.publishStatus(plugin.getServer().getOnlinePlayers().size(), matchService.liveMatches().size(), queues);
+        redisLiveCache.publishMatches(matchService.liveMatches());
+    }
+
+    public void shutdown() {
+        if (matchmakingService != null) matchmakingService.stop();
+        if (scoreboardService != null) scoreboardService.stop();
+        if (websiteApiService != null) websiteApiService.stop();
+        if (matchService != null) matchService.shutdown();
+        if (profileService != null) profileService.shutdown();
+        if (databaseService != null) databaseService.shutdown();
+        if (redisService != null) redisService.shutdown();
+    }
+
+    public MERankedPlugin plugin() { return plugin; }
+    public ConfigService config() { return configService; }
+    public MessageService messages() { return messageService; }
+    public DatabaseService database() { return databaseService; }
+    public RedisService redis() { return redisService; }
+    public TierService tiers() { return tierService; }
+    public RatingService rating() { return ratingService; }
+    public ProfileService profiles() { return profileService; }
+    public SeasonService seasons() { return seasonService; }
+    public PlacementService placements() { return placementService; }
+    public PlacementScalingService placementScaling() { return placementScalingService; }
+    public AntiBoostService antiBoost() { return antiBoostService; }
+    public LeaderboardService leaderboard() { return leaderboardService; }
+    public DecayService decay() { return decayService; }
+    public RankProgressService rankProgress() { return rankProgressService; }
+    public UpsetService upsets() { return upsetService; }
+    public QueueService queue() { return queueService; }
+    public BanService bans() { return banService; }
+    public AntiDodgeService antiDodge() { return antiDodgeService; }
+    public MatchmakingService matchmaking() { return matchmakingService; }
+    public ArenaService arenas() { return arenaService; }
+    public ArenaRegenService arenaRegen() { return arenaRegenService; }
+    public ArenaVoteService arenaVoting() { return arenaVoteService; }
+    public CinematicService cinematic() { return cinematicService; }
+    public MatchService matches() { return matchService; }
+    public MatchQualityService matchQuality() { return matchQualityService; }
+    public KitService kits() { return kitService; }
+    public KitChecksumService kitChecksums() { return kitChecksumService; }
+    public KitEditorService kitEditor() { return kitEditorService; }
+    public DefaultKitService defaultKits() { return defaultKitService; }
+    public KitValidationService kitValidation() { return kitValidationService; }
+    public ScoreboardService scoreboards() { return scoreboardService; }
+    public SpectateService spectating() { return spectateService; }
+    public SpectateRequestService spectateRequests() { return spectateRequestService; }
+    public ReplayService replays() { return replayService; }
+    public RegionService regions() { return regionService; }
+    public AlertService alerts() { return alertService; }
+    public DiscordWebhookService discord() { return discordWebhookService; }
+    public SuspicionService suspicion() { return suspicionService; }
+    public WatchlistService watchlist() { return watchlistService; }
+    public RollbackService rollback() { return rollbackService; }
+    public DetectionService detection() { return detectionService; }
+    public AltLockService altLock() { return altLockService; }
+    public StaffService staff() { return staffService; }
+    public PlayerSettingsService settings() { return settingsService; }
+    public WebsiteApiService websiteApi() { return websiteApiService; }
+    public RedisLiveCache redisLive() { return redisLiveCache; }
+    public UtilityService utility() { return utilityService; }
+    public PlaceholderBridge placeholders() { return placeholderBridge; }
+    public GuiManager gui() { return guiManager; }
+}

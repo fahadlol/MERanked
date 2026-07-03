@@ -1,0 +1,7 @@
+best-of-three:
+  enabled: true
+  minimum-tier: "HT3"
+  rating-updates-per-round: false
+  reset-arena-between-rounds: true
+  rounds-to-win: 2
+  max-rounds: 3

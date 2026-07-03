@@ -1,0 +1,39 @@
+enabled: true
+editor-item:
+  material: NETHER_STAR
+  name: "<gradient:#D6B36A:#7C3AED><bold>Kit Editor</bold></gradient>"
+  lore:
+    - "<gray>Right-click to edit your ranked kits.</gray>"
+
+armor-trims:
+  enabled: true
+  allow-trim-materials:
+    - diamond
+    - emerald
+    - gold
+    - netherite
+    - amethyst
+  allow-trim-patterns:
+    - silence
+    - ward
+    - vex
+    - tide
+    - sentry
+
+controls:
+  use-item-display: true
+  use-text-display: true
+  use-interaction: true
+  npc-fallback: true
+
+illegal-items:
+  - BEDROCK
+  - BARRIER
+  - COMMAND_BLOCK
+  - STRUCTURE_VOID
+  - JIGSAW
+  - LIGHT
+
+max-items-per-slot: 64
+allow-shulker-editing: true
+allow-ender-chest-editing: true

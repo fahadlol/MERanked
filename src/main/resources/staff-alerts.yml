@@ -1,0 +1,33 @@
+enabled: true
+
+discord:
+  enabled: false
+  webhook-url: "https://discord.com/api/webhooks/example"
+  mention-role-id: ""
+  alert-min-severity: MEDIUM
+
+in-game:
+  enabled: true
+  clickable-actions: true
+  min-severity: LOW
+
+severities:
+  - LOW
+  - MEDIUM
+  - HIGH
+  - CRITICAL
+
+alert-types:
+  - SAME_IP_MATCH
+  - REPEATED_OPPONENT
+  - SHORT_MATCH
+  - SUSPICIOUS_DISCONNECT
+  - QUEUE_DODGE
+  - RATING_SPIKE
+  - UNUSUAL_WIN_STREAK
+  - ALT_BOOSTING
+  - ARENA_BUG
+  - REPLAY_FLAGGED
+  - MANUAL_FLAG
+  - BROKEN_ARENA
+  - ILLEGAL_KIT

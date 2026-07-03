@@ -1,0 +1,18 @@
+package com.meranked.gui;
+
+public enum GuiType {
+    RANKED_MENU,
+    PROFILE,
+    PLACEMENT_RECAP,
+    SETTINGS,
+    STAFF_ALERTS,
+    STAFF_ALERT_DETAIL,
+    REPLAY,
+    KIT_AUDIT,
+    WATCHLIST,
+    ROLLBACK_CONFIRM,
+    DEFAULT_KIT_CONFIRM,
+    LEADERBOARD,
+    TRIM_EDITOR,
+    ENDER_CHEST_EDITOR
+}

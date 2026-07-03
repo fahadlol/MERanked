@@ -1,0 +1,78 @@
+punishments:
+  enabled: true
+  gui:
+    type-title: "<red><bold>Punish <player></bold></red>"
+    reason-title: "<red>Select Reason — <player></red>"
+    duration-title: "<red>Select Duration — <player></red>"
+    confirm-title: "<red>Confirm Punishment</red>"
+
+  types:
+    ban:
+      slot: 11
+      material: BARRIER
+      permission: meranked.punish.ban
+      reasons: [Cheating, Boosting, Alting, Evading, Exploiting, Doxing, Other]
+    mute:
+      slot: 13
+      material: BOOK
+      permission: meranked.punish.mute
+      reasons: [Toxicity, Spam, Racism, Harassment, Advertising, Other]
+    kick:
+      slot: 15
+      material: LEATHER_BOOTS
+      permission: meranked.punish.kick
+      reasons: [Warning, "Bug abuse", "Staff request", Other]
+    rankedban:
+      slot: 19
+      material: IRON_SWORD
+      permission: meranked.punish.rankedban
+      reasons: [Boosting, Dodging, Alting, "Illegal kit", Other]
+    queueban:
+      slot: 21
+      material: COMPASS
+      permission: meranked.punish.rankedban
+      reasons: [Dodging, "Queue abuse", Other]
+    spectateban:
+      slot: 23
+      material: ENDER_EYE
+      permission: meranked.punish.rankedban
+      reasons: ["Spectate abuse", Other]
+    chatmute:
+      slot: 25
+      material: PAPER
+      permission: meranked.punish.mute
+      reasons: [Toxicity, Spam, Other]
+
+  history-slot: 22
+
+  # preset durations in seconds; 0 = permanent, -1 = custom prompt
+  durations:
+    - { label: "30 minutes", seconds: 1800 }
+    - { label: "1 hour", seconds: 3600 }
+    - { label: "3 hours", seconds: 10800 }
+    - { label: "6 hours", seconds: 21600 }
+    - { label: "12 hours", seconds: 43200 }
+    - { label: "1 day", seconds: 86400 }
+    - { label: "3 days", seconds: 259200 }
+    - { label: "7 days", seconds: 604800 }
+    - { label: "14 days", seconds: 1209600 }
+    - { label: "30 days", seconds: 2592000 }
+    - { label: "Permanent", seconds: 0 }
+    - { label: "Custom", seconds: -1 }
+
+  # suggested escalating durations for ranked offenses (seconds)
+  ranked-presets:
+    boosting: [604800, 2592000, 0]
+    dodging: [86400]
+    alting: [0]
+    illegal-kit: [1209600]
+
+  webhook:
+    enabled: false
+    url: ""
+
+  messages:
+    banned: "<prefix> <red>You have been banned: <reason></red>"
+    muted: "<prefix> <red>You have been muted: <reason></red>"
+    ranked-banned: "<prefix> <red>You have been ranked-banned: <reason></red>"
+    confirm: "<prefix> <green>Punishment applied to <player>.</green>"

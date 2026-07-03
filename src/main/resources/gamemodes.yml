@@ -1,0 +1,64 @@
+gamemodes:
+  Crystal:
+    display: Crystal
+    icon: END_CRYSTAL
+    enabled: true
+    placement-matches: 7
+    max-placement-tier: LT3
+    default-kit: crystal_default
+  Mace:
+    display: Mace
+    icon: MACE
+    enabled: true
+    placement-matches: 7
+    max-placement-tier: LT3
+    default-kit: mace_default
+  Sword:
+    display: Sword
+    icon: DIAMOND_SWORD
+    enabled: true
+    placement-matches: 7
+    max-placement-tier: LT3
+    default-kit: sword_default
+  UHC:
+    display: UHC
+    icon: GOLDEN_APPLE
+    enabled: true
+    placement-matches: 7
+    max-placement-tier: LT3
+    default-kit: uhc_default
+  "Spear Mace":
+    display: "Spear Mace"
+    icon: TRIDENT
+    enabled: true
+    placement-matches: 7
+    max-placement-tier: LT3
+    default-kit: spear_mace_default
+  Axe:
+    display: Axe
+    icon: DIAMOND_AXE
+    enabled: true
+    placement-matches: 7
+    max-placement-tier: LT3
+    default-kit: axe_default
+  SMP:
+    display: SMP
+    icon: GRASS_BLOCK
+    enabled: true
+    placement-matches: 7
+    max-placement-tier: LT3
+    default-kit: smp_default
+  "Diamond Pot":
+    display: "Diamond Pot"
+    icon: SPLASH_POTION
+    enabled: true
+    placement-matches: 7
+    max-placement-tier: LT3
+    default-kit: diamond_pot_default
+  "Netherite Pot":
+    display: "Netherite Pot"
+    icon: LINGERING_POTION
+    enabled: true
+    placement-matches: 7
+    max-placement-tier: LT3
+    default-kit: netherite_pot_default

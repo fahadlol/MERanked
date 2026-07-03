@@ -1,0 +1,23 @@
+evidence:
+  enabled: true
+  # outputs to generate when building a bundle
+  outputs:
+    in-game-gui: true
+    website: true
+    discord-webhook: false
+    json-export: true
+    text-summary: true
+  json-export-folder: "evidence"
+  include:
+    replay-timeline: true
+    combat-stats: true
+    rating-changes: true
+    match-quality: true
+    suspicion-score: true
+    alerts: true
+    staff-notes: true
+    ip-flags: true
+    dodge-data: true
+    friend-farming: true
+    kit-audit: true
+    rollback-history: true

@@ -1,0 +1,9 @@
+kit-checksum:
+  enabled: true
+  algorithm: "SHA-256"
+  # block a kit from being applied if its checksum does not match the stored value
+  block-on-mismatch: true
+  alert-on-mismatch: true
+  alert-severity: "HIGH"
+  # keep a change log of kit versions
+  store-change-log: true

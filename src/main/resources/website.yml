@@ -1,0 +1,10 @@
+enabled: true
+port: 8080
+host: "0.0.0.0"
+api-key: "change-me"
+rate-limit:
+  enabled: true
+  requests-per-minute: 120
+cors-enabled: true
+base-url: "http://localhost:8080"
+serve-website: true

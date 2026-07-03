@@ -1,0 +1,8 @@
+current-season: 1
+
+seasons:
+  1:
+    name: "Season 1"
+    start-date: "2026-01-01"
+    end-date: ""
+    active: true

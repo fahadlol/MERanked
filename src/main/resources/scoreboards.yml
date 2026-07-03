@@ -1,0 +1,50 @@
+enabled: true
+
+spawn:
+  title: MERanked
+  lines:
+    - "────────────"
+    - "Player: %player%"
+    - "Region: %region%"
+    - "Season: #%season%"
+    - ""
+    - "Mace: %mace_tier%"
+    - "Crystal: %crystal_tier%"
+    - "Queue: %queue_status%"
+    - ""
+    - "/ranked"
+    - "────────────"
+
+queue:
+  title: IN QUEUE
+  lines:
+    - "────────────"
+    - "Mode: %gamemode%"
+    - "Time: %queue_time%s"
+    - "Range: ±%range%"
+    - "Status: Searching..."
+    - ""
+    - "/ranked leave"
+    - "────────────"
+
+match:
+  title: RANKED DUEL
+  lines:
+    - "────────────"
+    - "Mode: %gamemode%"
+    - "Opponent: %opponent%"
+    - "Your Tier: %tier%"
+    - "Their Tier: %opponent_tier%"
+    - ""
+    - "Time: %match_time%"
+    - "Ping: %ping%ms"
+    - ""
+    - "Rating: %rating%"
+    - "Potential: +%win_gain% / -%loss_loss%"
+    - "────────────"
+
+placement:
+  lines:
+    - "Status: #0 Unranked"
+    - "Placements: %played%/%required%"
+    - "Tier: Hidden"

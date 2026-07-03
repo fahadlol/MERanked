@@ -1,0 +1,11 @@
+restart-protection:
+  enabled: true
+  block-new-matches-before-restart-seconds: 300
+  warn-active-matches: true
+  cancel-queue-on-restart: true
+  # if true, an urgent restart cancels active matches with no rating change
+  cancel-active-on-urgent: true
+  messages:
+    queue-disabled: "<prefix> <red>Ranked queue is disabled because the server is restarting soon.</red>"
+    queue-locked: "<prefix> <red>Ranked queue is currently locked: <reason>.</red>"
+    active-match-warning: "<prefix> <yellow>Server restarting soon. Finish your match quickly.</yellow>"

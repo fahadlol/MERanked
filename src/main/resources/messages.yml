@@ -1,0 +1,104 @@
+prefix: "<gradient:#D6B36A:#7C3AED><bold>MERanked</bold></gradient> <dark_gray>»</dark_gray>"
+
+general:
+  no-permission: "<prefix> <red>You do not have permission.</red>"
+  player-not-found: "<prefix> <red>Player not found.</red>"
+  reload-success: "<prefix> <green>Configuration reloaded.</green>"
+  must-be-player: "<prefix> <red>This command is for players only.</red>"
+  command-blocked-in-match: "<prefix> <red>That command is blocked during ranked matches.</red>"
+
+queue:
+  joined: "<prefix> <teal>Joined queue for <gold><gamemode></gold>. Searching...</teal>"
+  left: "<prefix> <gray>Left the ranked queue.</gray>"
+  already-queued: "<prefix> <red>You are already in queue.</red>"
+  not-queued: "<prefix> <red>You are not in queue.</red>"
+  match-found: "<prefix> <green>Match found! Preparing arena vote...</green>"
+  invalid-gamemode: "<prefix> <red>Invalid gamemode: <gamemode></red>"
+  cooldown: "<prefix> <red>Queue cooldown: <time></red>"
+  hidden: "<prefix> <red>You dodged too many matches. Ranked queue is hidden for <time>.</red>"
+  in-match: "<prefix> <red>You are already in a match.</red>"
+  in-editor: "<prefix> <red>Leave the kit editor first.</red>"
+  banned: "<prefix> <red>You are banned from ranked. Reason: <reason></red>"
+  locked: "<prefix> <red>Ranked queue is currently locked: <reason>.</red>"
+  cancelled: "<prefix> <yellow>You left the ranked queue.</yellow>"
+  cancel-dodge: "<prefix> <red>Match already found. This cancel counted as a dodge.</red>"
+
+dodge:
+  penalty: "<prefix> <red>Match dodge detected. Cooldown: <time></red>"
+  info: "<prefix> <gray><player> dodges: <count> | Hidden: <hidden> | Cooldown: <time></gray>"
+
+match:
+  victory-title: "<green><bold>VICTORY</bold></green>"
+  victory-subtitle: "<green>+<rating_change> Rating</green>"
+  defeat-title: "<red><bold>DEFEAT</bold></red>"
+  defeat-subtitle: "<red>-<rating_change> Rating</red>"
+  fight: "<gold><bold>FIGHT!</bold></gold>"
+  countdown: "<yellow><count></yellow>"
+  round-title: "<gold><bold>ROUND <round></bold></gold>"
+  round-subtitle: "<white><player_score> - <opponent_score></white>"
+  match-quality: "<prefix> <gray>Match Quality:</gray> <white><quality>%</white> <dark_gray>-</dark_gray> <gray><reason></gray>"
+  summary: |
+    <gray>Damage Dealt:</gray> <white><damage></white>
+    <gray>Totems Popped:</gray> <white><totems></white>
+    <gray>Crystals Placed:</gray> <white><crystals></white>
+    <gray>Match Time:</gray> <white><time></white>
+    <gray>Rating:</gray> <white><old_rating></white> <dark_gray>→</dark_gray> <white><new_rating></white>
+  no-rating-change: "<prefix> <gray>No rating change applied for this match.</gray>"
+  disconnect-loss: "<prefix> <red>Disconnect during match counts as a loss.</red>"
+
+placement:
+  recap-title: "<gradient:#D6B36A:#7C3AED><bold>TIER REVEALED</bold></gradient>"
+  recap: |
+    <prefix> <gold><gamemode></gold> placements completed.
+    <gray>Record:</gray> <white><wins>W - <losses>L</white>
+    <gray>Best Win:</gray> <white>vs <opponent> [<opponent_tier>]</white>
+    <gray>Average Opponent:</gray> <white><avg_opponent></white>
+    <gray>Final Tier:</gray> <gold><tier></gold>
+    <gray>Confidence:</gray> <white><confidence></white>
+
+promotion:
+  promoted: "<prefix> <green>Promoted to <tier>!</green>"
+  demotion-shield: "<prefix> <gray>Demotion Shield: <shield> matches</gray>"
+  demoted: "<prefix> <red>Demoted to <tier>.</red>"
+
+arena:
+  vote-title: "<gradient:#D6B36A:#7C3AED><bold>Vote Arena</bold></gradient>"
+  auto-disabled: "<prefix> <red>Arena <arena> was auto-disabled. Reason: <reason></red>"
+  regen-failed: "<prefix> <red>Arena regeneration failed for <arena>.</red>"
+
+cinematic:
+  title: "<gradient:#D6B36A:#7C3AED><bold>RANKED DUEL</bold></gradient>"
+  subtitle: "<player1> [<tier1>] <dark_gray>vs</dark_gray> <player2> [<tier2>]"
+  skip-actionbar: "<gray>Hold</gray> <yellow>SHIFT</yellow> <gray>to skip intro</gray>"
+  streak-line: "<gold>%player%</gold> <gray>[%tier%]</gray> <yellow>%streak%</yellow>"
+  skip-vote: "<prefix> <gray>%player% voted to skip the intro.</gray>"
+
+kit-editor:
+  entered: "<prefix> <gray>Editing kit for <gamemode>...</gray>"
+  saved: "<prefix> <green>Kit saved for <gamemode>.</green>"
+  reverted: "<prefix> <yellow>Changes reverted.</yellow>"
+  left: "<prefix> <gray>Left kit editor.</gray>"
+  illegal-item: "<prefix> <red>Illegal item detected. Kit not saved.</red>"
+
+region:
+  set: "<prefix> <green>Region set to <region>.</green>"
+  hidden: "<prefix> <gray>Region tag hidden.</gray>"
+
+spectate:
+  joined: "<prefix> <gray>Spectating match <match_id>.</gray>"
+  left: "<prefix> <gray>Stopped spectating.</gray>"
+  not-available: "<prefix> <red>Spectating is not available for this match.</red>"
+
+staff:
+  alert: "<prefix> <red>Alert » <type></red> <gray>Players: <players> | Match: <match_id> | Reason: <reason></gray>"
+  watchlist-added: "<prefix> <green>Added <player> to watchlist.</green>"
+  rollback-success: "<prefix> <green>Rollback applied for match <match_id>.</green>"
+
+utility:
+  spawn: "<prefix> <gray>Teleported to spawn.</gray>"
+  ping-self: "<prefix> <gray>Your ping: <ping>ms</gray>"
+  ping-other: "<prefix> <gray><player>'s ping: <ping>ms</gray>"
+  msg-format-sent: "<dark_gray>[</dark_gray><gold>You</gold> <dark_gray>→</dark_gray> <white><target></white><dark_gray>]</dark_gray> <message>"
+  msg-format-received: "<dark_gray>[</dark_gray><white><sender></white> <dark_gray>→</dark_gray> <gold>You</gold><dark_gray>]</dark_gray> <message>"
+  msg-disabled: "<prefix> <red>That player has messages disabled.</red>"
+  no-reply-target: "<prefix> <red>No one to reply to.</red>"

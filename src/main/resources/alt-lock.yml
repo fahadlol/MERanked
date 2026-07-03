@@ -1,0 +1,22 @@
+alt-confidence-lock:
+  enabled: true
+  # accounts newer than this many days are treated as "new"
+  new-account-days: 3
+  low-playtime-hours: 5
+  # if same IP as an existing ranked player -> suspicious
+  flag-same-ip: true
+  suspicious-suspicion-threshold: 50
+  fast-climb-rating-per-hour: 250
+  # placement caps applied per trust classification
+  caps:
+    trusted: LT3
+    new-account: HT4
+    suspicious: LT4
+  player-message: "<prefix> <yellow>Your account is still calibrating. Placement cap is temporarily limited.</yellow>"
+  alert-severity: "MEDIUM"
+
+region-switching:
+  change-cooldown-days: 7
+  suspicious-changes-per-week: 2
+  alert-on-suspicious-switching: true
+  alert-severity: "MEDIUM"

@@ -1,0 +1,7 @@
+queue-ghosting:
+  enabled: true
+  # flag after this many queue-leaves while a specific opponent was queued
+  leave-threshold: 5
+  window-minutes: 30
+  suspicion-increase: 10
+  alert-severity: "MEDIUM"

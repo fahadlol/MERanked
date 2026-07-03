@@ -1,0 +1,46 @@
+profile:
+  title: "<gradient:#D6B36A:#7C3AED><bold>Profile</bold></gradient>"
+  size: 54
+
+placement-recap:
+  title: "Placement Recap"
+  size: 27
+  slots:
+    final-tier: 10
+    record: 12
+    best-win: 14
+    confidence: 16
+    continue: 22
+
+arena-vote:
+  title: "<gradient:#D6B36A:#7C3AED><bold>Vote Arena</bold></gradient>"
+  size: 27
+
+kit-audit:
+  title: "Kit Audit - %player%"
+  size: 54
+  slots:
+    inventory: 10
+    armor: 12
+    shulkers: 14
+    ender-chest: 16
+    validation: 28
+    reset: 30
+    copy: 32
+    flag: 34
+
+staff-alerts:
+  title: "<gradient:#D6B36A:#7C3AED><bold>Staff Alerts</bold></gradient>"
+  size: 54
+
+staff-watchlist:
+  title: "Staff Watchlist"
+  size: 54
+
+replay:
+  title: "Replay - %match_id%"
+  size: 54
+
+ranked-menu:
+  title: "<gradient:#D6B36A:#7C3AED><bold>MERanked</bold></gradient>"
+  size: 45

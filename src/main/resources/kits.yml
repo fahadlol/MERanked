@@ -1,0 +1,37 @@
+defaults:
+  mace_default:
+    gamemode: Mace
+    armor: []
+    inventory: []
+  crystal_default:
+    gamemode: Crystal
+    armor: []
+    inventory: []
+  sword_default:
+    gamemode: Sword
+    armor: []
+    inventory: []
+  axe_default:
+    gamemode: Axe
+    armor: []
+    inventory: []
+  smp_default:
+    gamemode: SMP
+    armor: []
+    inventory: []
+  uhc_default:
+    gamemode: UHC
+    armor: []
+    inventory: []
+  spear_mace_default:
+    gamemode: "Spear Mace"
+    armor: []
+    inventory: []
+  diamond_pot_default:
+    gamemode: "Diamond Pot"
+    armor: []
+    inventory: []
+  netherite_pot_default:
+    gamemode: "Netherite Pot"
+    armor: []
+    inventory: []

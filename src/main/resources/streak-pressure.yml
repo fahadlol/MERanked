@@ -1,0 +1,20 @@
+underdog:
+  enabled: true
+  # opponent rating advantage thresholds
+  upset-threshold: 200
+  major-upset-threshold: 400
+  # extra rating multiplier applied to the base Glicko gain on an upset
+  upset-bonus-multiplier: 1.15
+  major-upset-bonus-multiplier: 1.30
+  messages:
+    upset-title: "UPSET VICTORY"
+    upset-subtitle: "You defeated a higher-ranked opponent."
+    upset-chat: "<prefix> <gold>Upset victory! You gained +<gain> rating.</gold>"
+    major-upset-chat: "<prefix> <gold>Major upset! You defeated a much higher-rated player.</gold>"
+
+streak-pressure:
+  enabled: true
+  show-in-intro: true
+  show-in-profile: true
+  announce-at-streak: 5
+  hot-streak-broadcast: "<prefix> <red><bold>HOT STREAK</bold></red> <yellow><player> is on a <streak> win streak.</yellow>"

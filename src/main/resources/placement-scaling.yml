@@ -1,0 +1,22 @@
+enabled: true
+
+# Placement cap based on account trust level.
+placement-caps:
+  trusted: LT3
+  new-account: HT4
+  suspicious: LT4
+
+# Hidden matchmaking rating targets during placements based on W-L record.
+difficulty:
+  base-hidden-rating: 1500
+  # rating shift applied per net win/loss during placements
+  per-net-win: 65
+  per-net-loss: 65
+  min-hidden-rating: 1100
+  max-hidden-rating: 1750
+  # after this many strong wins, test against LT3/HT3 level opponents
+  test-threshold-net-wins: 4
+  test-target-rating: 1700
+
+# how strongly placement opponent difficulty affects final placed rating
+final-accuracy-weight: 0.35

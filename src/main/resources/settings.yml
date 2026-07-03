@@ -1,0 +1,32 @@
+enabled: true
+command: settings
+gui-title: "<gradient:#D6B36A:#7C3AED><bold>Settings</bold></gradient>"
+gui-size: 45
+
+options:
+  messages:
+    slot: 10
+    name: "<gold>Private Messages</gold>"
+    lore:
+      - "<gray>Toggle /msg and /reply</gray>"
+  spectate-requests:
+    slot: 12
+    name: "<gold>Spectate Requests</gold>"
+    lore:
+      - "<gray>Allow players to request spectating your matches</gray>"
+  queue-notifications:
+    slot: 14
+    name: "<gold>Queue Notifications</gold>"
+    lore:
+      - "<gray>Match found sound and messages</gray>"
+  region-display:
+    slot: 16
+    name: "<gold>Region Display</gold>"
+    lore:
+      - "<gray>Show or hide your region tag</gray>"
+
+defaults:
+  messages-enabled: true
+  spectate-requests-enabled: true
+  queue-notifications: true
+  region-hidden: false

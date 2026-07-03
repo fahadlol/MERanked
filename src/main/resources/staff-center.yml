@@ -1,0 +1,15 @@
+staff-center:
+  enabled: true
+  title: "<gradient:#D6B36A:#7C3AED><bold>MERanked Staff Center</bold></gradient>"
+  size: 54
+  items:
+    live-matches: 10
+    staff-alerts: 12
+    watchlist: 14
+    suspicious-players: 16
+    broken-arenas: 28
+    kit-audits: 30
+    rollback-logs: 32
+    evidence-bundles: 34
+    ranked-bans: 40
+    close: 49

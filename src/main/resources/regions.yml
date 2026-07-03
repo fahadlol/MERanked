@@ -1,0 +1,33 @@
+tags:
+  KSA:
+    display: KSA
+    icon: RED_BANNER
+  UAE:
+    display: UAE
+    icon: LIME_BANNER
+  Kuwait:
+    display: Kuwait
+    icon: LIGHT_BLUE_BANNER
+  Bahrain:
+    display: Bahrain
+    icon: WHITE_BANNER
+  Qatar:
+    display: Qatar
+    icon: PURPLE_BANNER
+  Oman:
+    display: Oman
+    icon: GREEN_BANNER
+  Jordan:
+    display: Jordan
+    icon: YELLOW_BANNER
+  Egypt:
+    display: Egypt
+    icon: ORANGE_BANNER
+  Other:
+    display: Other
+    icon: GRAY_BANNER
+  Hidden:
+    display: Hidden
+    icon: BARRIER
+
+default: Other

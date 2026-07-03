@@ -1,0 +1,26 @@
+staff-silent:
+  enabled: true
+  invisible: true
+  silent: true
+  can-fly: true
+  view-inventories-permission: meranked.staff.viewinventory
+
+player-spectate:
+  enabled: true
+  max-spectators-per-match: 10
+  delay-seconds: 0
+  block-placements: true
+  block-messages-to-fighters: true
+  remove-before-regen: true
+
+request-system:
+  enabled: false
+
+commands:
+  staff:
+    - staffspectate
+    - sspec
+  player:
+    - spectate
+    - spec
+    - unspectate

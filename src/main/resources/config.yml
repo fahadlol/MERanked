@@ -1,0 +1,65 @@
+# MERanked - Gold Rift Theme
+# Middle East competitive ranked core
+
+prefix: "<gradient:#D6B36A:#7C3AED><bold>MERanked</bold></gradient> <dark_gray>»</dark_gray>"
+
+debug: false
+
+spawn:
+  world: world
+  x: 0.5
+  y: 100.0
+  z: 0.5
+  yaw: 0.0
+  pitch: 0.0
+
+kit-editor-spawn:
+  world: world
+  x: 100.5
+  y: 100.0
+  z: 100.5
+  yaw: 180.0
+  pitch: 0.0
+
+season:
+  auto-start: true
+  current-season-id: 1
+
+rank-protection:
+  enabled: true
+  matches-after-promotion: 2
+  protect-from-demotion-only: true
+  decrease-on-loss: true
+  decrease-on-match: false
+
+placement:
+  matches-required: 7
+  max-tier: LT2
+  hide-rating: true
+  hide-estimated-tier: true
+
+decay:
+  enabled: true
+  inactive-days: 14
+  rd-increase-per-day: 2.0
+  max-rd-increase: 50.0
+
+match:
+  min-duration-seconds: 30
+  countdown-seconds: 3
+  post-match-delay-seconds: 5
+  block-commands: true
+  allowed-commands:
+    - msg
+    - r
+    - reply
+    - ping
+
+rating-spike-detection:
+  enabled: true
+  max-rating-gain-per-hour: 180
+  max-rating-gain-per-day: 350
+  ignore-placements: true
+
+discord-link: "https://discord.gg/meranked"
+rules-link: "https://meranked.gg/rules"

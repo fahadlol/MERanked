@@ -1,0 +1,26 @@
+type: SQLITE
+
+sqlite:
+  file: meranked.db
+
+mysql:
+  host: localhost
+  port: 3306
+  database: meranked
+  username: root
+  password: ""
+  use-ssl: false
+  pool-size: 10
+
+redis:
+  enabled: false
+  host: localhost
+  port: 6379
+  password: ""
+  database: 0
+  prefix: "meranked:"
+
+async:
+  write-batch-interval-ms: 500
+  write-batch-size: 100
+  profile-cache-ttl-seconds: 300

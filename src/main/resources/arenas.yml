@@ -1,0 +1,18 @@
+arenas:
+  regeneration:
+    method: FAWE
+    fallback-method: SNAPSHOT
+    regen-delay-seconds: 3
+    remove-drops: true
+    remove-projectiles: true
+    remove-crystals: true
+    reset-containers: true
+  cloning:
+    enabled: true
+    copies-per-arena: 3
+    clone-world: ranked_arenas
+    spacing: 300
+
+auto-disable:
+  enabled: true
+  alert-severity: HIGH

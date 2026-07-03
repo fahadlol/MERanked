@@ -1,0 +1,11 @@
+demotion:
+  enabled: true
+  warn-in-chat: true
+  warn-before-match: true
+  warn-in-actionbar: true
+  # warn when within this many rating points of the demotion threshold
+  warn-threshold: 25
+  chat-warning: "<prefix> <yellow>Warning: You are close to demoting from <tier>.</yellow>"
+  pre-match-title: "DEMOTION RISK"
+  pre-match-subtitle: "Lose this match and you may drop to <next_lower>."
+  actionbar: "<red>Demotion Risk</red> <dark_gray>|</dark_gray> <gray>Current:</gray> <white><rating></white> <dark_gray>|</dark_gray> <gray>Safe:</gray> <white><safe>+</white>"

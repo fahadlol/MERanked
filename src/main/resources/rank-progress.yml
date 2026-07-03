@@ -1,0 +1,15 @@
+rank-progress:
+  enabled: true
+  bar-length: 10
+  filled-char: "█"
+  empty-char: "░"
+  filled-color: "<green>"
+  empty-color: "<dark_gray>"
+  # send progress bar in chat after a rating update
+  show-in-chat: true
+  # send progress bar in action bar after a match
+  show-in-actionbar: true
+  actionbar-duration-seconds: 5
+  chat-format: "<gold><tier></gold> <bar> <white><rating>/<next_rating></white> <gray>→</gray> <gold><next_tier></gold>"
+  actionbar-format: "<gold><tier></gold> <bar> <white><rating>/<next_rating></white> <gray>→</gray> <gold><next_tier></gold>"
+  max-tier-format: "<gold><tier></gold> <bar> <white><rating></white>"

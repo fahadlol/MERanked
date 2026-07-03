@@ -1,0 +1,8 @@
+enabled: true
+duration-seconds: 6
+shift-to-skip: true
+require-both-skip: false
+freeze-players: true
+title: "<gradient:#D6B36A:#7C3AED><bold>RANKED DUEL</bold></gradient>"
+subtitle: "<player1> [<tier1>] <dark_gray>vs</dark_gray> <player2> [<tier2>]"
+skip-actionbar: "<gray>Hold</gray> <yellow>SHIFT</yellow> <gray>to skip intro</gray>"

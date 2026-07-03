@@ -1,0 +1,24 @@
+enabled: true
+
+ranges:
+  - min-seconds: 0
+    max-seconds: 30
+    rating-range: 100
+  - min-seconds: 30
+    max-seconds: 60
+    rating-range: 200
+  - min-seconds: 60
+    max-seconds: 90
+    rating-range: 300
+  - min-seconds: 90
+    max-seconds: 9999
+    rating-range: 400
+
+prefer:
+  similar-confidence: true
+  # Soft rating penalty added when opponent confidence labels differ (higher = stronger preference).
+  confidence-weight: 150.0
+  different-recent-opponent: true
+  different-ip: true
+
+tick-interval-ms: 500

@@ -1,0 +1,25 @@
+match-quality:
+  enabled: true
+  # informational only unless cancel-low-quality is true
+  cancel-low-quality: false
+  cancel-below-percent: 40
+  store-in-history: true
+
+  weights:
+    rating-diff: 0.35
+    confidence-diff: 0.2
+    ping-diff: 0.15
+    recent-opponent: 0.15
+    queue-range: 0.15
+
+  # normalization references (values at/above these count as "worst")
+  max-rating-diff: 400
+  max-confidence-diff: 200
+  max-ping-diff: 200
+  max-queue-range: 400
+
+  reasons:
+    excellent: "Similar rating and stable confidence."
+    good: "Balanced match."
+    fair: "Some rating or confidence gap."
+    poor: "Wide rating range due to long queue time."

@@ -1,0 +1,85 @@
+tiers:
+  unranked:
+    id: "#0"
+    display: "Unranked"
+    min-rating: 0
+    max-rating: -1
+    demotion-buffer: 0
+  lt5:
+    id: LT5
+    display: "LT5"
+    min-rating: 0
+    max-rating: 899
+    demotion-buffer: 40
+  ht5:
+    id: HT5
+    display: "HT5"
+    min-rating: 900
+    max-rating: 1099
+    demotion-buffer: 40
+  lt4:
+    id: LT4
+    display: "LT4"
+    min-rating: 1100
+    max-rating: 1299
+    demotion-buffer: 40
+  ht4:
+    id: HT4
+    display: "HT4"
+    min-rating: 1300
+    max-rating: 1499
+    demotion-buffer: 40
+  lt3:
+    id: LT3
+    display: "LT3"
+    min-rating: 1500
+    max-rating: 1699
+    demotion-buffer: 40
+  ht3:
+    id: HT3
+    display: "HT3"
+    min-rating: 1700
+    max-rating: 1899
+    demotion-buffer: 40
+  lt2:
+    id: LT2
+    display: "LT2"
+    min-rating: 1900
+    max-rating: 2099
+    demotion-buffer: 40
+  ht2:
+    id: HT2
+    display: "HT2"
+    min-rating: 2100
+    max-rating: 2299
+    demotion-buffer: 40
+  lt1:
+    id: LT1
+    display: "LT1"
+    min-rating: 2300
+    max-rating: 2499
+    demotion-buffer: 40
+  ht1:
+    id: HT1
+    display: "HT1"
+    min-rating: 2500
+    max-rating: 99999
+    demotion-buffer: 40
+
+confidence:
+  calibrating:
+    min-rd: 250
+    max-rd: 9999
+    display: Calibrating
+  unstable:
+    min-rd: 160
+    max-rd: 249
+    display: Unstable
+  stable:
+    min-rd: 80
+    max-rd: 159
+    display: Stable
+  locked-in:
+    min-rd: 0
+    max-rd: 79
+    display: "Locked In"

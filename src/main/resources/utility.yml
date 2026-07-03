@@ -1,0 +1,16 @@
+spawn-enabled: true
+hub-enabled: true
+ping-enabled: true
+msg-enabled: true
+socialspy-enabled: true
+discord-enabled: true
+rules-enabled: true
+help-enabled: true
+
+help-lines:
+  - "<gradient:#D6B36A:#7C3AED><bold>MERanked Help</bold></gradient>"
+  - "<gold>/ranked</gold> <gray>- Open ranked menu</gray>"
+  - "<gold>/queue <gamemode></gold> <gray>- Join ranked queue</gray>"
+  - "<gold>/kiteditor</gold> <gray>- Edit your kits</gray>"
+  - "<gold>/region</gold> <gray>- Set region tag</gray>"
+  - "<gold>/spectate</gold> <gray>- Spectate matches</gray>"

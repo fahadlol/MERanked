@@ -1,0 +1,20 @@
+enabled: true
+
+same-opponent:
+  max-rated-matches-per-day: 2
+  no-rating-after-limit: true
+
+same-ip:
+  no-rating: true
+
+short-match:
+  min-duration-seconds: 30
+  no-rating: true
+
+disconnect:
+  counts-as-loss: true
+
+suspicious:
+  flag-repeated-opponents: true
+  flag-short-wins: true
+  flag-same-ip: true
