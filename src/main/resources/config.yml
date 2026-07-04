@@ -34,7 +34,7 @@ rank-protection:
 
 placement:
   matches-required: 7
-  max-tier: LT2
+  max-tier: LT3
   hide-rating: true
   hide-estimated-tier: true
 
