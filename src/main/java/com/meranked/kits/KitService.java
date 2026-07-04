@@ -52,6 +52,18 @@ public final class KitService {
         return cache.computeIfAbsent(key, k -> loadKit(uuid, gamemode));
     }
 
+    /**
+     * Warms the kit + checksum caches off the main thread. Called when a match is found so the kit is
+     * ready in memory by the time players are teleported (avoids blocking DB reads at match start).
+     */
+    public void preloadAsync(UUID uuid, String gamemode) {
+        String key = uuid + ":" + gamemode;
+        if (!cache.containsKey(key)) {
+            plugin.tasks().runAsync(() -> cache.computeIfAbsent(key, k -> loadKit(uuid, gamemode)));
+        }
+        if (checksumService != null) checksumService.preloadAsync(uuid, gamemode);
+    }
+
     public void saveKit(UUID uuid, String gamemode, ItemStack[] inventory, ItemStack[] armor, ItemStack[] enderChest) {
         StoredKit kit = new StoredKit(inventory.clone(), armor.clone(),
                 enderChest == null ? new ItemStack[27] : enderChest.clone());

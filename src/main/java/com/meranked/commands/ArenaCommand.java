@@ -67,6 +67,21 @@ public final class ArenaCommand implements CommandExecutor, TabCompleter {
                 services.arenas().allArenas().forEach(a ->
                         sender.sendMessage("§7- §f" + a.name() + " §8[" + (a.enabled() ? "§aON" : "§cOFF") + "§8]"));
             }
+            case "tag" -> {
+                if (args.length >= 3) {
+                    String tag = args[2];
+                    if (!arena.tags().remove(tag)) arena.tags().add(tag);
+                    services.arenas().saveArenaAsync(arena);
+                    sender.sendMessage("§aTags: " + String.join(", ", arena.tags()));
+                }
+            }
+            case "description", "desc" -> {
+                if (args.length >= 3) {
+                    arena.setDescription(String.join(" ", java.util.Arrays.copyOfRange(args, 2, args.length)));
+                    services.arenas().saveArenaAsync(arena);
+                    sender.sendMessage("§aDescription set.");
+                }
+            }
             case "regen" -> services.arenas().regenerateArenaAsync(arena, 0, () -> sender.sendMessage("§aRegeneration queued."));
             case "saveclone" -> services.arenas().saveCloneAsync(arena, ok ->
                     sender.sendMessage(ok ? "§aClone/schematic saved for " + name + "." : "§cSave failed. Check pos1/pos2."));

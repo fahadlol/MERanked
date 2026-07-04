@@ -3,6 +3,7 @@ package com.meranked.matches;
 import com.meranked.MERankedPlugin;
 import com.meranked.config.ConfigService;
 import com.meranked.database.DatabaseService;
+import com.meranked.model.QueueEntry;
 import com.meranked.model.RankedMatch;
 import com.meranked.model.RankedProfile;
 import com.meranked.rating.TierService;
@@ -82,14 +83,71 @@ public final class MatchQualityService {
         return new QualityResult(quality, reason, ratingDiff, confDiff, pingDiff, queueRange);
     }
 
+    /** Pre-match quality estimate for matchmaking candidate selection. */
+    public QualityResult evaluateForQueue(QueueEntry a, QueueEntry b, int queueRange, int recentMatches) {
+        FileConfiguration cfg = configService.get("match-quality.yml");
+        double maxRating = cfg.getDouble("match-quality.max-rating-diff", 400);
+        double maxConf = cfg.getDouble("match-quality.max-confidence-diff", 200);
+        double maxPing = cfg.getDouble("match-quality.max-ping-diff", 200);
+        double maxRange = cfg.getDouble("match-quality.max-queue-range", 400);
+
+        double ratingDiff = Math.abs(a.rating() - b.rating());
+        double confDiff = Math.abs(a.ratingDeviation() - b.ratingDeviation());
+        int pingDiff = Math.abs(a.ping() - b.ping());
+
+        double wRating = cfg.getDouble("match-quality.weights.rating-diff", 0.35);
+        double wConf = cfg.getDouble("match-quality.weights.confidence-diff", 0.2);
+        double wPing = cfg.getDouble("match-quality.weights.ping-diff", 0.15);
+        double wRecent = cfg.getDouble("match-quality.weights.recent-opponent", 0.15);
+        double wRange = cfg.getDouble("match-quality.weights.queue-range", 0.15);
+
+        double penalty =
+                wRating * clamp(ratingDiff / maxRating) +
+                wConf * clamp(confDiff / maxConf) +
+                wPing * clamp(pingDiff / maxPing) +
+                wRecent * clamp(recentMatches / 3.0) +
+                wRange * clamp(queueRange / maxRange);
+
+        int quality = (int) Math.round((1.0 - penalty) * 100);
+        quality = Math.max(0, Math.min(100, quality));
+
+        String reason = buildReason(cfg, quality, queueRange, maxRange, ratingDiff, maxRating);
+        return new QualityResult(quality, reason, ratingDiff, confDiff, pingDiff, queueRange);
+    }
+
+    public String buildMatchmakingReason(QualityResult result, QueueEntry a, QueueEntry b) {
+        return String.format("Quality %d%% | Rating gap %.0f | Ping gap %dms | Regions: %s vs %s",
+                result.quality(), result.ratingDiff(), result.pingDiff(),
+                a.region() == null ? "?" : a.region(), b.region() == null ? "?" : b.region());
+    }
+
+    private String buildReason(FileConfiguration cfg, int quality, int queueRange, double maxRange,
+                               double ratingDiff, double maxRating) {
+        String base = "match-quality.reasons.";
+        if (queueRange >= maxRange * 0.75 && ratingDiff > maxRating * 0.5) {
+            return cfg.getString(base + "poor", "Wide rating range due to long queue time.");
+        } else if (quality >= 90) {
+            return cfg.getString(base + "excellent", "Similar rating and stable confidence.");
+        } else if (quality >= 75) {
+            return cfg.getString(base + "good", "Balanced match.");
+        } else if (quality >= 55) {
+            return cfg.getString(base + "fair", "Some rating or confidence gap.");
+        }
+        return cfg.getString(base + "poor", "Wide rating range due to long queue time.");
+    }
+
     public void store(String matchId, QualityResult result) {
+        store(matchId, result, null);
+    }
+
+    public void store(String matchId, QualityResult result, String matchmakingReason) {
         FileConfiguration cfg = configService.get("match-quality.yml");
         if (!cfg.getBoolean("match-quality.store-in-history", true)) return;
         database.executeAsync(conn -> {
             try (PreparedStatement ps = conn.prepareStatement("""
                 INSERT OR REPLACE INTO ranked_match_quality
-                (match_id, quality, reason, rating_diff, confidence_diff, ping_diff, queue_range)
-                VALUES (?,?,?,?,?,?,?)
+                (match_id, quality, reason, rating_diff, confidence_diff, ping_diff, queue_range, matchmaking_reason)
+                VALUES (?,?,?,?,?,?,?,?)
                 """)) {
                 ps.setString(1, matchId);
                 ps.setInt(2, result.quality());
@@ -98,6 +156,7 @@ public final class MatchQualityService {
                 ps.setDouble(5, result.confidenceDiff());
                 ps.setInt(6, result.pingDiff());
                 ps.setInt(7, result.queueRange());
+                ps.setString(8, matchmakingReason);
                 ps.executeUpdate();
             }
         });

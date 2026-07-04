@@ -45,8 +45,11 @@ public final class PlacementService {
 
         profile.setRanked(true);
         if (scalingService != null) {
-            profile.setRating(scalingService.refineFinalRating(profile));
+            double refined = scalingService.refineFinalRating(profile);
+            refined += profile.placementBehaviorBias();
+            profile.setRating(refined);
         }
+        profile.setHiddenMmr(profile.rating());
         String tier = tierService.getTierForRating(profile.rating(), false);
         FileConfiguration gamemodes = configService.get("gamemodes.yml");
         String maxTier = gamemodes.getString("gamemodes." + profile.gamemode() + ".max-placement-tier", "LT3");

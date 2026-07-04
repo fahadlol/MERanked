@@ -1,0 +1,9 @@
+knockback-sync:
+  enabled: true
+  # Only apply during active ranked matches.
+  ranked-matches-only: true
+  # Ping offset ms (community consensus ~25 for KB sync).
+  ping-offset-ms: 25
+  # Scale knockback: higher ping = slightly reduced KB advantage (factor toward 1.0).
+  max-correction: 0.18
+  reference-ping: 50

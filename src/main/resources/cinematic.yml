@@ -6,3 +6,11 @@ freeze-players: true
 title: "<gradient:#D6B36A:#7C3AED><bold>RANKED DUEL</bold></gradient>"
 subtitle: "<player1> [<tier1>] <dark_gray>vs</dark_gray> <player2> [<tier2>]"
 skip-actionbar: "<gray>Hold</gray> <yellow>SHIFT</yellow> <gray>to skip intro</gray>"
+
+# Arena preview shown during the cinematic intro.
+arena-preview:
+  enabled: true
+  # spawn a floating TextDisplay hologram near the player showing the arena info
+  hologram: true
+  chat-preview: true
+  format: "<gold><bold><arena></bold></gold>\n<gray><tags></gray>\n<gray><description></gray>"

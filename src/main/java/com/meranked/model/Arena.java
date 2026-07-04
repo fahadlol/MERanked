@@ -27,10 +27,17 @@ public final class Arena {
     private String brokenReason;
     private int usageCount;
     private String lastRegenResult = "OK";
+    private Set<String> tags = new HashSet<>();
+    private String description = "";
 
     public Arena(String name) {
         this.name = name;
     }
+
+    public Set<String> tags() { return tags; }
+    public void setTags(Set<String> tags) { this.tags = tags; }
+    public String description() { return description; }
+    public void setDescription(String description) { this.description = description; }
 
     public String name() { return name; }
     public Set<String> allowedGamemodes() { return allowedGamemodes; }

@@ -19,8 +19,9 @@ import com.meranked.kits.KitService;
 import com.meranked.kits.KitValidationService;
 import com.meranked.matchmaking.MatchmakingService;
 import com.meranked.matches.CinematicService;
-import com.meranked.matches.MatchQualityService;
-import com.meranked.matches.MatchService;
+import com.meranked.combat.LatencyKnockbackService;
+import com.meranked.matches.CoachingInsightService;
+import com.meranked.matches.FairnessDashboardService;
 import com.meranked.placeholders.PlaceholderBridge;
 import com.meranked.queue.AntiDodgeService;
 import com.meranked.queue.QueueService;
@@ -32,7 +33,19 @@ import com.meranked.scoreboard.ScoreboardService;
 import com.meranked.settings.PlayerSettingsService;
 import com.meranked.spectating.SpectateRequestService;
 import com.meranked.spectating.SpectateService;
-import com.meranked.staff.*;
+import com.meranked.matches.MatchQualityService;
+import com.meranked.matches.MatchService;
+import com.meranked.staff.AltLockService;
+import com.meranked.staff.BanService;
+import com.meranked.staff.BehaviorFingerprintService;
+import com.meranked.staff.DetectionService;
+import com.meranked.staff.EvidenceService;
+import com.meranked.staff.PunishmentService;
+import com.meranked.staff.RollbackService;
+import com.meranked.staff.StaffNotesService;
+import com.meranked.staff.StaffService;
+import com.meranked.staff.SuspicionService;
+import com.meranked.staff.WatchlistService;
 import com.meranked.utility.UtilityService;
 import com.meranked.voting.ArenaVoteService;
 
@@ -52,6 +65,8 @@ public final class ServiceRegistry {
     private SeasonService seasonService;
     private PlacementService placementService;
     private PlacementScalingService placementScalingService;
+    private PlacementBehaviorService placementBehaviorService;
+    private HiddenMmrService hiddenMmrService;
     private AntiBoostService antiBoostService;
     private LeaderboardService leaderboardService;
     private DecayService decayService;
@@ -69,6 +84,8 @@ public final class ServiceRegistry {
     private CinematicService cinematicService;
     private MatchService matchService;
     private MatchQualityService matchQualityService;
+    private CoachingInsightService coachingInsightService;
+    private FairnessDashboardService fairnessDashboardService;
 
     private KitService kitService;
     private KitChecksumService kitChecksumService;
@@ -89,7 +106,12 @@ public final class ServiceRegistry {
     private RollbackService rollbackService;
     private StaffService staffService;
     private DetectionService detectionService;
+    private BehaviorFingerprintService behaviorFingerprintService;
     private AltLockService altLockService;
+    private StaffNotesService staffNotesService;
+    private PunishmentService punishmentService;
+    private EvidenceService evidenceService;
+    private RestartProtectionService restartProtectionService;
 
     private PlayerSettingsService settingsService;
     private WebsiteApiService websiteApiService;
@@ -124,6 +146,8 @@ public final class ServiceRegistry {
         profileService = new ProfileService(plugin, databaseService, configService, tierService, ratingService, seasonService);
         placementService = new PlacementService(configService, tierService, profileService);
         placementScalingService = new PlacementScalingService(configService);
+        placementBehaviorService = new PlacementBehaviorService(configService);
+        hiddenMmrService = new HiddenMmrService(configService, tierService);
         placementService.bindScaling(placementScalingService);
         antiBoostService = new AntiBoostService(configService, databaseService);
         leaderboardService = new LeaderboardService(plugin, configService, databaseService, tierService);
@@ -142,6 +166,8 @@ public final class ServiceRegistry {
         arenaVoteService = new ArenaVoteService(plugin, configService, messageService, arenaService);
         cinematicService = new CinematicService(plugin, configService, messageService);
         matchQualityService = new MatchQualityService(plugin, configService, databaseService, tierService);
+        coachingInsightService = new CoachingInsightService(configService);
+        fairnessDashboardService = new FairnessDashboardService(plugin, configService, databaseService);
         matchService = new MatchService(plugin, this);
         matchmakingService.bindServices(this);
 
@@ -165,7 +191,14 @@ public final class ServiceRegistry {
         rollbackService = new RollbackService(plugin, databaseService, profileService, matchService, alertService);
         staffService = new StaffService(plugin, alertService, suspicionService, watchlistService, rollbackService);
         detectionService = new DetectionService(plugin, this);
+        behaviorFingerprintService = new BehaviorFingerprintService(plugin, this);
         altLockService = new AltLockService(plugin, this);
+        staffNotesService = new StaffNotesService(plugin, databaseService);
+        punishmentService = new PunishmentService(plugin, this);
+        punishmentService.loadAll();
+        evidenceService = new EvidenceService(plugin, this);
+        restartProtectionService = new RestartProtectionService(plugin, this);
+        queueService.setLockHolder(restartProtectionService);
 
         redisLiveCache = new RedisLiveCache(plugin, redisService);
         websiteApiService = new WebsiteApiService(plugin, configService, this);
@@ -174,6 +207,7 @@ public final class ServiceRegistry {
         placeholderBridge = new PlaceholderBridge(this);
 
         plugin.getServer().getPluginManager().registerEvents(new GuiListener(this), plugin);
+        plugin.getServer().getPluginManager().registerEvents(new LatencyKnockbackService(this), plugin);
 
         matchmakingService.start();
         scoreboardService.start();
@@ -215,6 +249,8 @@ public final class ServiceRegistry {
     public SeasonService seasons() { return seasonService; }
     public PlacementService placements() { return placementService; }
     public PlacementScalingService placementScaling() { return placementScalingService; }
+    public PlacementBehaviorService placementBehavior() { return placementBehaviorService; }
+    public HiddenMmrService hiddenMmr() { return hiddenMmrService; }
     public AntiBoostService antiBoost() { return antiBoostService; }
     public LeaderboardService leaderboard() { return leaderboardService; }
     public DecayService decay() { return decayService; }
@@ -230,6 +266,8 @@ public final class ServiceRegistry {
     public CinematicService cinematic() { return cinematicService; }
     public MatchService matches() { return matchService; }
     public MatchQualityService matchQuality() { return matchQualityService; }
+    public CoachingInsightService coachingInsights() { return coachingInsightService; }
+    public FairnessDashboardService fairnessDashboard() { return fairnessDashboardService; }
     public KitService kits() { return kitService; }
     public KitChecksumService kitChecksums() { return kitChecksumService; }
     public KitEditorService kitEditor() { return kitEditorService; }
@@ -246,7 +284,12 @@ public final class ServiceRegistry {
     public WatchlistService watchlist() { return watchlistService; }
     public RollbackService rollback() { return rollbackService; }
     public DetectionService detection() { return detectionService; }
+    public BehaviorFingerprintService behaviorFingerprint() { return behaviorFingerprintService; }
     public AltLockService altLock() { return altLockService; }
+    public StaffNotesService staffNotes() { return staffNotesService; }
+    public PunishmentService punishments() { return punishmentService; }
+    public EvidenceService evidence() { return evidenceService; }
+    public RestartProtectionService restartProtection() { return restartProtectionService; }
     public StaffService staff() { return staffService; }
     public PlayerSettingsService settings() { return settingsService; }
     public WebsiteApiService websiteApi() { return websiteApiService; }

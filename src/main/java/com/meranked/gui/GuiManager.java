@@ -4,6 +4,7 @@ import com.meranked.MERankedPlugin;
 import com.meranked.bootstrap.ServiceRegistry;
 import com.meranked.config.ConfigService;
 import com.meranked.kits.DefaultKitService;
+import com.meranked.matches.FairnessDashboardService;
 import com.meranked.model.RankedProfile;
 import com.meranked.model.StaffAlert;
 import com.meranked.rating.LeaderboardService;
@@ -91,6 +92,16 @@ public final class GuiManager {
         inv.setItem(32, item(Material.EXPERIENCE_BOTTLE, "Confidence", tierService.getConfidenceLabel(p.ratingDeviation())));
         if (p.inPlacements(services.profiles().placementRequired(gamemode))) {
             inv.setItem(31, item(Material.BARRIER, "Placements", p.placementPlayed() + "/" + services.profiles().placementRequired(gamemode)));
+        } else {
+            String bar = TextUtil.plain(TextUtil.parse(services.rankProgress().buildBar(p)));
+            inv.setItem(31, item(Material.EMERALD, "Progress",
+                    bar + " " + Math.round(p.rating()) + "/" + services.rankProgress().nextTierId(p),
+                    "Rating to next: " + services.rankProgress().ratingToNext(p)));
+            if (services.rankProgress().atDemotionRisk(p)) {
+                inv.setItem(40, item(Material.REDSTONE, "<red>Demotion Risk: Yes</red>",
+                        "Current Rating: " + Math.round(p.rating()),
+                        "Safe Rating: " + services.rankProgress().safeRating(p) + "+"));
+            }
         }
         setSession(player, GuiSession.of(GuiType.PROFILE, gamemode));
         player.openInventory(inv);
@@ -306,6 +317,225 @@ public final class GuiManager {
         }
         setSession(player, GuiSession.of(GuiType.ENDER_CHEST_EDITOR, gamemode));
         player.openInventory(inv);
+    }
+
+    // ---- Ranked Identity Card ----
+
+    public void openIdentityCard(Player viewer, UUID target, String targetName) {
+        FileConfiguration cfg = configService.get("identity-card.yml");
+        var rp = services.profiles().getPlayer(target);
+        String region = rp == null ? "Other" : (rp.regionHidden() ? "Hidden" : rp.region());
+        Inventory inv = Bukkit.createInventory(null, 45, TextUtil.parse(
+                cfg.getString("title", "<gold><player></gold>").replace("<player>", targetName).replace("<region>", region)));
+
+        ItemStack skull = new ItemStack(Material.PLAYER_HEAD);
+        SkullMeta meta = (SkullMeta) skull.getItemMeta();
+        meta.setOwningPlayer(Bukkit.getOfflinePlayer(target));
+        meta.displayName(TextUtil.parse("<gold>" + targetName + " [" + region + "]</gold>"));
+        skull.setItemMeta(meta);
+        inv.setItem(4, skull);
+
+        // per-gamemode tiers
+        int slot = 19;
+        RankedProfile best = null;
+        int totalWins = 0, totalLosses = 0, bestStreak = 0;
+        String mainTier = "#0";
+        for (String mode : services.profiles().enabledGamemodes()) {
+            RankedProfile p = services.profiles().getProfile(target, mode);
+            if (!p.ranked()) continue;
+            if (slot <= 25) {
+                inv.setItem(slot++, item(Material.NETHER_STAR, "<gold>" + mode + "</gold>",
+                        p.tier() + " — " + Math.round(p.rating())));
+            }
+            totalWins += p.wins();
+            totalLosses += p.losses();
+            bestStreak = Math.max(bestStreak, p.winStreak());
+            if (best == null || p.rating() > best.rating()) { best = p; mainTier = p.tier(); }
+        }
+        int rate = totalWins + totalLosses == 0 ? 0 : Math.round(100f * totalWins / (totalWins + totalLosses));
+        String bestMode = best == null ? "N/A" : best.gamemode();
+        int seasonRank = best == null ? 0 : services.leaderboard().getRankCached(target, bestMode);
+
+        inv.setItem(29, item(Material.GOLD_INGOT, "<gold>Main Tier</gold>", mainTier));
+        inv.setItem(30, item(Material.DIAMOND, "<gold>Peak Tier</gold>", best == null ? "N/A" : best.peakTier()));
+        inv.setItem(31, item(Material.NETHERITE_SWORD, "<gold>Best Gamemode</gold>", bestMode));
+        inv.setItem(32, item(Material.EXPERIENCE_BOTTLE, "<gold>Confidence</gold>",
+                best == null ? "N/A" : tierService.getConfidenceLabel(best.ratingDeviation())));
+        inv.setItem(33, item(Material.PAPER, "<gold>Season Rank</gold>", seasonRank <= 0 ? "Unranked" : "#" + seasonRank));
+        inv.setItem(38, item(Material.BOOK, "<gold>Win Rate</gold>", rate + "%"));
+        inv.setItem(42, item(Material.BLAZE_POWDER, "<gold>Current Streak</gold>", bestStreak + "W"));
+        setSession(viewer, GuiSession.of(GuiType.IDENTITY_CARD, target.toString()));
+        viewer.openInventory(inv);
+    }
+
+    // ---- Fairness / Transparency Dashboard ----
+
+    public void openFairnessDashboard(Player player) {
+        if (!services.fairnessDashboard().enabled()) return;
+        FileConfiguration cfg = configService.get("fairness-dashboard.yml");
+        int size = cfg.getInt("fairness-dashboard.size", 45);
+        String title = cfg.getString("fairness-dashboard.title", "Match Fairness");
+
+        plugin.tasks().runAsync(() -> {
+            var history = services.fairnessDashboard().recentMatches(player.getUniqueId());
+            double mmrGap = 0;
+            String mode = services.profiles().enabledGamemodes().get(0);
+            var profile = services.profiles().getProfile(player.getUniqueId(), mode);
+            if (profile.ranked()) mmrGap = services.hiddenMmr().mmrGap(profile);
+
+            double gapFinal = mmrGap;
+            plugin.tasks().runSync(() -> {
+                Inventory inv = Bukkit.createInventory(null, size, TextUtil.parse(title));
+                inv.setItem(4, item(Material.BOOK, "<gold>Fairness Pledge</gold>",
+                        cfg.getString("fairness-dashboard.pledge", "").split("\n")));
+                inv.setItem(13, item(Material.COMPASS, "<gold>Hidden MMR Gap</gold>",
+                        "Gap: " + Math.round(gapFinal) + " rating",
+                        "Positive = playing above visible tier"));
+                int slot = 19;
+                for (FairnessDashboardService.FairnessEntry e : history) {
+                    if (slot > 34) break;
+                    inv.setItem(slot++, item(Material.PAPER,
+                            "<gray>" + e.gamemode() + " — " + e.quality() + "%</gray>",
+                            e.reason() == null ? "" : e.reason(),
+                            "Rating gap: " + Math.round(e.ratingDiff()),
+                            "Ping gap: " + e.pingDiff() + "ms"));
+                }
+                inv.setItem(size - 5, item(Material.RED_CONCRETE, "<red>Close</red>", "Close"));
+                setSession(player, GuiSession.of(GuiType.FAIRNESS_DASHBOARD));
+                player.openInventory(inv);
+            });
+        });
+    }
+
+    // ---- Staff Command Center ----
+
+    public void openStaffCenter(Player staff) {
+        FileConfiguration cfg = configService.get("staff-center.yml");
+        int size = cfg.getInt("staff-center.size", 54);
+        Inventory inv = Bukkit.createInventory(null, size, TextUtil.parse(
+                cfg.getString("staff-center.title", "MERanked Staff Center")));
+        inv.setItem(cfg.getInt("staff-center.items.live-matches", 10),
+                item(Material.DIAMOND_SWORD, "<gold>Live Matches</gold>", services.matches().liveMatches().size() + " active"));
+        inv.setItem(cfg.getInt("staff-center.items.staff-alerts", 12),
+                item(Material.BELL, "<gold>Staff Alerts</gold>", services.alerts().recentAlerts().size() + " recent"));
+        inv.setItem(cfg.getInt("staff-center.items.watchlist", 14),
+                item(Material.ENDER_EYE, "<gold>Watchlist</gold>", "View watched players"));
+        inv.setItem(cfg.getInt("staff-center.items.suspicious-players", 16),
+                item(Material.SPYGLASS, "<gold>Suspicious Players</gold>", "Flagged accounts"));
+        inv.setItem(cfg.getInt("staff-center.items.broken-arenas", 28),
+                item(Material.BARRIER, "<gold>Broken Arenas</gold>", "Disabled arenas"));
+        inv.setItem(cfg.getInt("staff-center.items.kit-audits", 30),
+                item(Material.CHEST, "<gold>Kit Audits</gold>", "Inspect kits"));
+        inv.setItem(cfg.getInt("staff-center.items.rollback-logs", 32),
+                item(Material.CLOCK, "<gold>Rollback Logs</gold>", "Recent rollbacks"));
+        inv.setItem(cfg.getInt("staff-center.items.evidence-bundles", 34),
+                item(Material.WRITABLE_BOOK, "<gold>Evidence Bundles</gold>", "Generated bundles"));
+        inv.setItem(cfg.getInt("staff-center.items.ranked-bans", 40),
+                item(Material.IRON_BARS, "<gold>Ranked Bans</gold>", "Active bans"));
+        inv.setItem(cfg.getInt("staff-center.items.close", 49),
+                item(Material.RED_CONCRETE, "<red>Close</red>", "Close menu"));
+        setSession(staff, GuiSession.of(GuiType.STAFF_CENTER));
+        staff.openInventory(inv);
+    }
+
+    // ---- Rollback Preview ----
+
+    public void openRollbackPreview(Player staff, String matchId) {
+        plugin.tasks().runAsync(() -> {
+            Map<String, Object> data = services.rollback().previewMatch(matchId);
+            plugin.tasks().runSync(() -> {
+                Inventory inv = Bukkit.createInventory(null, 45, TextUtil.parse("<red>Rollback Preview — " + matchId + "</red>"));
+                @SuppressWarnings("unchecked")
+                List<String> lines = (List<String>) data.getOrDefault("lines", List.of());
+                int slot = 10;
+                for (String line : lines) {
+                    if (slot > 16) break;
+                    inv.setItem(slot++, item(Material.PAPER, "<gray>Change</gray>", line));
+                }
+                inv.setItem(29, item(Material.PAPER, "<gray>Affected</gray>",
+                        "Leaderboard cache", "Match history", "Peak tier", "Suspicion score"));
+                inv.setItem(20, item(Material.LIME_CONCRETE, "<green>Confirm Rollback</green>", "Apply changes"));
+                inv.setItem(24, item(Material.RED_CONCRETE, "<red>Cancel</red>", "Go back"));
+                inv.setItem(22, item(Material.WRITABLE_BOOK, "<gold>Export Evidence</gold>", "Generate bundle"));
+                setSession(staff, GuiSession.of(GuiType.ROLLBACK_PREVIEW, matchId));
+                staff.openInventory(inv);
+            });
+        });
+    }
+
+    // ---- Punishment GUIs ----
+
+    public void openPunishType(Player staff, UUID target, String targetName) {
+        FileConfiguration cfg = configService.get("punishments.yml");
+        Inventory inv = Bukkit.createInventory(null, 36, TextUtil.parse(
+                cfg.getString("punishments.gui.type-title", "Punish <player>").replace("<player>", targetName)));
+        var section = cfg.getConfigurationSection("punishments.types");
+        if (section != null) {
+            for (String type : section.getKeys(false)) {
+                int slot = cfg.getInt("punishments.types." + type + ".slot", 0);
+                Material mat = matOf(cfg.getString("punishments.types." + type + ".material", "PAPER"));
+                inv.setItem(slot, item(mat, "<gold>" + capitalize(type) + "</gold>", "Click to select"));
+            }
+        }
+        inv.setItem(cfg.getInt("punishments.history-slot", 22), item(Material.BOOK, "<yellow>History</yellow>", "View punishment history"));
+        setSession(staff, new GuiSession(GuiType.PUNISH_TYPE, target.toString(), targetName));
+        staff.openInventory(inv);
+    }
+
+    public void openPunishReason(Player staff, UUID target, String targetName, String type) {
+        FileConfiguration cfg = configService.get("punishments.yml");
+        Inventory inv = Bukkit.createInventory(null, 27, TextUtil.parse(
+                cfg.getString("punishments.gui.reason-title", "Select Reason").replace("<player>", targetName)));
+        List<String> reasons = cfg.getStringList("punishments.types." + type + ".reasons");
+        int slot = 0;
+        for (String reason : reasons) {
+            if (slot >= 27) break;
+            inv.setItem(slot++, item(Material.PAPER, "<gold>" + reason + "</gold>", "Click to select"));
+        }
+        setSession(staff, new GuiSession(GuiType.PUNISH_REASON, target.toString() + "|" + type, targetName));
+        staff.openInventory(inv);
+    }
+
+    public void openPunishDuration(Player staff, UUID target, String targetName, String type, String reason) {
+        FileConfiguration cfg = configService.get("punishments.yml");
+        Inventory inv = Bukkit.createInventory(null, 27, TextUtil.parse(
+                cfg.getString("punishments.gui.duration-title", "Select Duration").replace("<player>", targetName)));
+        List<Map<?, ?>> durations = cfg.getMapList("punishments.durations");
+        int slot = 0;
+        for (Map<?, ?> d : durations) {
+            if (slot >= 27) break;
+            String label = String.valueOf(d.get("label"));
+            long seconds = ((Number) d.get("seconds")).longValue();
+            inv.setItem(slot++, item(Material.CLOCK, "<gold>" + label + "</gold>", "Duration: " + label));
+            // encode seconds in lore-less; handled by label lookup in listener
+        }
+        setSession(staff, new GuiSession(GuiType.PUNISH_DURATION, target.toString() + "|" + type + "|" + reason, targetName));
+        staff.openInventory(inv);
+    }
+
+    public void openPunishConfirm(Player staff, UUID target, String targetName, String type, String reason, long durationSeconds, String durationLabel) {
+        FileConfiguration cfg = configService.get("punishments.yml");
+        Inventory inv = Bukkit.createInventory(null, 27, TextUtil.parse(
+                cfg.getString("punishments.gui.confirm-title", "Confirm Punishment")));
+        inv.setItem(4, item(Material.PLAYER_HEAD, "<gold>" + targetName + "</gold>",
+                "Type: " + capitalize(type), "Reason: " + reason, "Duration: " + durationLabel));
+        inv.setItem(11, item(Material.LIME_CONCRETE, "<green>Confirm</green>", "Apply punishment"));
+        inv.setItem(15, item(Material.RED_CONCRETE, "<red>Cancel</red>", "Discard"));
+        String context = target + "|" + type + "|" + reason + "|" + durationSeconds;
+        setSession(staff, new GuiSession(GuiType.PUNISH_CONFIRM, context, durationLabel));
+        staff.openInventory(inv);
+    }
+
+    private String capitalize(String s) {
+        return s.isEmpty() ? s : Character.toUpperCase(s.charAt(0)) + s.substring(1);
+    }
+
+    private Material matOf(String name) {
+        try {
+            return Material.valueOf(name.toUpperCase());
+        } catch (IllegalArgumentException ex) {
+            return Material.PAPER;
+        }
     }
 
     private ItemStack item(Material mat, String name, String... lore) {

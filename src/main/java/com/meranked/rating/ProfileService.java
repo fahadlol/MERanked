@@ -10,6 +10,7 @@ import org.bukkit.entity.Player;
 
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -50,10 +51,11 @@ public final class ProfileService {
 
     public void ensurePlayer(Player player) {
         UUID uuid = player.getUniqueId();
+        String name = player.getName();
         if (!playerCache.containsKey(uuid)) {
             RankedPlayer rp = loadPlayerSync(uuid);
             if (rp == null) {
-                rp = RankedPlayer.create(uuid, player.getName());
+                rp = RankedPlayer.create(uuid, name);
                 savePlayerAsync(rp);
             }
             playerCache.put(uuid, rp);
@@ -65,6 +67,36 @@ public final class ProfileService {
                 getProfile(uuid, mode);
             }
         }
+    }
+
+    /**
+     * Loads the player record and all gamemode profiles off the main thread, then populates the cache.
+     * Used on join to avoid a burst of blocking DB queries when many players connect at once.
+     */
+    public void preloadAsync(UUID uuid, String name) {
+        plugin.tasks().runAsync(() -> {
+            if (!playerCache.containsKey(uuid)) {
+                RankedPlayer rp = loadPlayerSync(uuid);
+                if (rp == null) {
+                    rp = RankedPlayer.create(uuid, name);
+                    savePlayerAsync(rp);
+                }
+                playerCache.putIfAbsent(uuid, rp);
+            }
+            FileConfiguration gamemodes = configService.get("gamemodes.yml");
+            var section = gamemodes.getConfigurationSection("gamemodes");
+            if (section != null) {
+                for (String mode : section.getKeys(false)) {
+                    profileCache.computeIfAbsent(cacheKey(uuid, mode), k -> loadProfileSync(uuid, mode));
+                }
+            }
+        });
+    }
+
+    /** Frees cached data for a player who is no longer online (called on quit, after flush). */
+    public void unloadPlayer(UUID uuid) {
+        playerCache.remove(uuid);
+        profileCache.keySet().removeIf(k -> k.startsWith(uuid + ":"));
     }
 
     public List<String> enabledGamemodes() {
@@ -100,6 +132,10 @@ public final class ProfileService {
         plugin.tasks().runAsyncTimer(this::flushPendingWrites, 40L, 40L);
     }
 
+    public void flushNow() {
+        flushPendingWrites();
+    }
+
     public void shutdown() {
         flushPendingWrites();
     }
@@ -114,8 +150,8 @@ public final class ProfileService {
                 (uuid, gamemode, rating, rating_deviation, volatility, tier, peak_rating, peak_tier,
                  peak_date, season_peak_rating, season_peak_tier, ranked, placement_played, placement_wins,
                  placement_losses, wins, losses, win_streak, best_win_opponent, best_win_tier, last_played,
-                 decay_active, rank_protection, season_id)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                 decay_active, rank_protection, season_id, hidden_mmr)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                 """)) {
                 for (RankedProfile p : batch) {
                     bindProfile(ps, p);
@@ -151,6 +187,7 @@ public final class ProfileService {
         ps.setBoolean(22, p.decayActive());
         ps.setInt(23, p.rankProtection());
         ps.setInt(24, p.seasonId());
+        ps.setDouble(25, p.hiddenMmr());
     }
 
     private RankedProfile loadProfileSync(UUID uuid, String gamemode) {
@@ -218,6 +255,7 @@ public final class ProfileService {
         p.setDecayActive(rs.getBoolean("decay_active"));
         p.setRankProtection(rs.getInt("rank_protection"));
         p.setSeasonId(rs.getInt("season_id"));
+        p.setHiddenMmr(rs.getDouble("hidden_mmr"));
         return p;
     }
 

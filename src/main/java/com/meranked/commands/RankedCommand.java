@@ -14,6 +14,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 public final class RankedCommand implements CommandExecutor, TabCompleter {
 
@@ -56,9 +57,25 @@ public final class RankedCommand implements CommandExecutor, TabCompleter {
                 services.queue().joinQueue(player, mode);
             }
             case "leave" -> services.queue().leaveQueue(player.getUniqueId());
+            case "cancel" -> handleCancel(player);
+            case "card" -> {
+                UUID target = player.getUniqueId();
+                String name = player.getName();
+                if (args.length > 1) {
+                    target = Bukkit.getOfflinePlayer(args[1]).getUniqueId();
+                    name = args[1];
+                }
+                services.gui().openIdentityCard(player, target, name);
+            }
+            case "fairness" -> services.gui().openFairnessDashboard(player);
             case "reload" -> {
                 if (!sender.hasPermission("meranked.admin")) {
                     services.messages().send(sender, "general.no-permission");
+                    return true;
+                }
+                boolean force = args.length > 1 && args[1].equalsIgnoreCase("force");
+                if (!force && (!services.matches().liveMatches().isEmpty() || anyEditing())) {
+                    services.messages().send(sender, "general.reload-blocked");
                     return true;
                 }
                 services.config().reloadAll();
@@ -114,6 +131,36 @@ public final class RankedCommand implements CommandExecutor, TabCompleter {
         return true;
     }
 
+    private boolean anyEditing() {
+        for (Player p : Bukkit.getOnlinePlayers()) {
+            if (services.kitEditor().isEditing(p.getUniqueId())) return true;
+        }
+        return false;
+    }
+
+    private void handleCancel(Player player) {
+        UUID uuid = player.getUniqueId();
+        var matchOpt = services.matches().getMatch(uuid);
+        if (matchOpt.isPresent()) {
+            var match = matchOpt.get();
+            switch (match.state()) {
+                case VOTING, CINEMATIC, COUNTDOWN -> {
+                    services.antiDodge().recordDodge(uuid);
+                    services.matches().handleLeaveDuringMatch(player);
+                    services.messages().send(player, "queue.cancel-dodge");
+                }
+                default -> services.messages().send(player, "queue.in-match");
+            }
+            return;
+        }
+        if (services.queue().isQueued(uuid)) {
+            services.queue().leaveQueue(uuid);
+            services.messages().send(player, "queue.cancelled");
+        } else {
+            services.messages().send(player, "queue.not-queued");
+        }
+    }
+
     private String resolveGamemode(String input) {
         if (input == null) return null;
         for (String mode : services.profiles().enabledGamemodes()) {
@@ -129,11 +176,13 @@ public final class RankedCommand implements CommandExecutor, TabCompleter {
     @Override
     public @Nullable List<String> onTabComplete(@NotNull CommandSender sender, @NotNull Command command, @NotNull String alias, @NotNull String[] args) {
         if (args.length == 1) {
-            return filter(List.of("queue", "leave", "reload", "alerts", "profile", "leaderboard", "rollback",
-                    "rollbackplayer", "rollbackgroup", "suspicion", "suspicious", "staffwatch", "unwatch",
-                    "watchlist", "dodgeinfo", "cleardodges", "history", "match", "setdefaultkit", "setrating",
-                    "setrd", "reset", "ban", "unban", "forcedecay", "startseason", "endseason", "queuehide",
-                    "queueunhide", "lowersuspicion", "clearsuspicion", "replayinfo", "deletereplay", "kit"), args[0]);
+            return filter(List.of("queue", "leave", "cancel", "card", "fairness", "staff", "reload", "alerts", "profile",
+                    "leaderboard", "rollback", "rollbackplayer", "rollbackgroup", "rollbackpreview", "suspicion",
+                    "suspicious", "staffwatch", "unwatch", "watchlist", "dodgeinfo", "cleardodges", "history",
+                    "match", "note", "notes", "matchnotes", "evidence", "punish", "unpunish", "queueban",
+                    "unqueueban", "lockqueue", "unlockqueue", "setdefaultkit", "setrating", "setrd", "reset",
+                    "ban", "unban", "forcedecay", "startseason", "endseason", "queuehide", "queueunhide",
+                    "lowersuspicion", "clearsuspicion", "replayinfo", "deletereplay", "kit"), args[0]);
         }
         if (args.length == 2 && (args[0].equalsIgnoreCase("queue") || args[0].equalsIgnoreCase("profile")
                 || args[0].equalsIgnoreCase("leaderboard"))) {

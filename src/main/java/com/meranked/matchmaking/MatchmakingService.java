@@ -3,6 +3,7 @@ package com.meranked.matchmaking;
 import com.meranked.MERankedPlugin;
 import com.meranked.bootstrap.ServiceRegistry;
 import com.meranked.config.ConfigService;
+import com.meranked.matches.MatchQualityService;
 import com.meranked.model.QueueEntry;
 import com.meranked.queue.QueueService;
 import com.meranked.rating.ProfileService;
@@ -27,7 +28,7 @@ public final class MatchmakingService {
     private final ProfileService profileService;
     private ServiceRegistry services;
     private BukkitTask task;
-    private final Set<String> recentPairs = new java.util.concurrent.ConcurrentHashMap<String, Boolean>().keySet();
+    private final java.util.Map<String, Long> recentPairs = new java.util.concurrent.ConcurrentHashMap<>();
 
     public MatchmakingService(MERankedPlugin plugin, ConfigService configService,
                               QueueService queueService, ProfileService profileService) {
@@ -53,6 +54,8 @@ public final class MatchmakingService {
 
     private void tick() {
         if (services == null) return;
+        long now = System.currentTimeMillis();
+        recentPairs.values().removeIf(expiry -> expiry <= now);
         for (String gamemode : profileService.enabledGamemodes()) {
             List<QueueEntry> queue = new ArrayList<>(queueService.getQueue(gamemode));
             queue.sort(Comparator.comparingLong(QueueEntry::joinedAt));
@@ -66,43 +69,100 @@ public final class MatchmakingService {
                     continue;
                 }
 
-                Optional<QueueEntry> opponent = findOpponent(entry, queue, matched);
+                Optional<Candidate> opponent = findOpponent(entry, queue, matched);
                 if (opponent.isEmpty()) continue;
 
                 matched.add(entry.uuid());
-                matched.add(opponent.get().uuid());
+                matched.add(opponent.get().entry().uuid());
                 queueService.removeFromQueue(entry.uuid());
-                queueService.removeFromQueue(opponent.get().uuid());
+                queueService.removeFromQueue(opponent.get().entry().uuid());
 
-                String pairKey = pairKey(entry.uuid(), opponent.get().uuid());
-                recentPairs.add(pairKey);
+                long cooldownMs = configService.get("matchmaking.yml")
+                        .getLong("rematch-cooldown-seconds", 30) * 1000L;
+                recentPairs.put(pairKey(entry.uuid(), opponent.get().entry().uuid()),
+                        System.currentTimeMillis() + cooldownMs);
 
                 int range = getRatingRange(entry.queueTimeSeconds());
-                services.matches().createMatch(gamemode, entry.uuid(), opponent.get().uuid(), range);
+                services.matches().createMatch(gamemode, entry.uuid(), opponent.get().entry().uuid(),
+                        range, opponent.get().matchmakingReason());
             }
         }
     }
 
-    private Optional<QueueEntry> findOpponent(QueueEntry seeker, List<QueueEntry> queue, Set<UUID> matched) {
+    private Optional<Candidate> findOpponent(QueueEntry seeker, List<QueueEntry> queue, Set<UUID> matched) {
         int range = getRatingRange(seeker.queueTimeSeconds());
         FileConfiguration config = configService.get("matchmaking.yml");
-        boolean preferConfidence = config.getBoolean("prefer.similar-confidence", true);
-        double confidenceWeight = config.getDouble("prefer.confidence-weight", 150.0);
+        boolean qualityMax = config.getBoolean("quality-maximizing.enabled", true);
+        int minQuality = config.getInt("quality-maximizing.min-quality-percent", 40);
 
-        return queue.stream()
+        List<QueueEntry> candidates = queue.stream()
                 .filter(e -> !e.uuid().equals(seeker.uuid()))
                 .filter(e -> !matched.contains(e.uuid()))
                 .filter(e -> Bukkit.getPlayer(e.uuid()) != null)
                 .filter(e -> Math.abs(e.rating() - seeker.rating()) <= range)
-                .filter(e -> !recentPairs.contains(pairKey(seeker.uuid(), e.uuid())))
+                .filter(e -> !recentPairs.containsKey(pairKey(seeker.uuid(), e.uuid())))
                 .filter(e -> {
                     if (!config.getBoolean("prefer.different-ip", true)) return true;
                     return seeker.ip() == null || e.ip() == null || !seeker.ip().equals(e.ip());
                 })
-                .min(Comparator.comparingDouble(e -> matchScore(seeker, e, preferConfidence, confidenceWeight)));
+                .filter(e -> regionCompatible(seeker, e))
+                .filter(e -> pingCompatible(seeker, e))
+                .toList();
+
+        if (candidates.isEmpty()) return Optional.empty();
+
+        if (qualityMax && services.matchQuality().enabled()) {
+            Candidate best = null;
+            for (QueueEntry c : candidates) {
+                int recent = services.antiBoost().recentOpponentCount(seeker.uuid(), c.uuid());
+                MatchQualityService.QualityResult q = services.matchQuality()
+                        .evaluateForQueue(seeker, c, range, recent);
+                if (q.quality() < minQuality) continue;
+                String reason = services.matchQuality().buildMatchmakingReason(q, seeker, c);
+                if (best == null || q.quality() > best.quality()) {
+                    best = new Candidate(c, q.quality(), reason);
+                }
+            }
+            if (best != null) return Optional.of(best);
+        }
+
+        // Fallback: closest rating + confidence preference
+        boolean preferConfidence = config.getBoolean("prefer.similar-confidence", true);
+        double confidenceWeight = config.getDouble("prefer.confidence-weight", 150.0);
+        QueueEntry pick = candidates.stream()
+                .min(Comparator.comparingDouble(e -> matchScore(seeker, e, preferConfidence, confidenceWeight)))
+                .orElse(null);
+        if (pick == null) return Optional.empty();
+        int recent = services.antiBoost().recentOpponentCount(seeker.uuid(), pick.uuid());
+        MatchQualityService.QualityResult q = services.matchQuality().evaluateForQueue(seeker, pick, range, recent);
+        return Optional.of(new Candidate(pick, q.quality(),
+                services.matchQuality().buildMatchmakingReason(q, seeker, pick)));
     }
 
-    /** Lower is better: pure rating gap, plus a soft penalty when confidence labels differ. */
+    private boolean regionCompatible(QueueEntry a, QueueEntry b) {
+        FileConfiguration cfg = configService.get("matchmaking.yml");
+        if (!cfg.getBoolean("region.enabled", true)) return true;
+        long relax = cfg.getLong("region.relax-after-seconds", 45);
+        if (a.queueTimeSeconds() >= relax || b.queueTimeSeconds() >= relax) return true;
+        if (!cfg.getBoolean("region.prefer-same-region", true)) return true;
+        if (a.region() == null || b.region() == null) return true;
+        if ("Hidden".equalsIgnoreCase(a.region()) || "Hidden".equalsIgnoreCase(b.region())) return true;
+        return a.region().equalsIgnoreCase(b.region());
+    }
+
+    private boolean pingCompatible(QueueEntry a, QueueEntry b) {
+        FileConfiguration cfg = configService.get("matchmaking.yml");
+        if (!cfg.getBoolean("region.enabled", true)) return true;
+        int maxCross = cfg.getInt("region.max-cross-region-ping", 150);
+        int hardCap = cfg.getInt("region.hard-ping-cap", 250);
+        int pingDiff = Math.abs(a.ping() - b.ping());
+        if (a.ping() > hardCap || b.ping() > hardCap) return false;
+        long relax = cfg.getLong("region.relax-after-seconds", 45);
+        if (a.queueTimeSeconds() >= relax && b.queueTimeSeconds() >= relax) return true;
+        if (a.region() != null && a.region().equalsIgnoreCase(b.region())) return pingDiff <= maxCross * 2;
+        return pingDiff <= maxCross;
+    }
+
     private double matchScore(QueueEntry seeker, QueueEntry candidate, boolean preferConfidence, double confidenceWeight) {
         double score = Math.abs(candidate.rating() - seeker.rating());
         if (preferConfidence && seeker.confidence() != null
@@ -130,4 +190,6 @@ public final class MatchmakingService {
         if (a.compareTo(b) < 0) return a + ":" + b;
         return b + ":" + a;
     }
+
+    private record Candidate(QueueEntry entry, int quality, String matchmakingReason) {}
 }

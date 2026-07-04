@@ -1,0 +1,10 @@
+hidden-mmr:
+  enabled: true
+  # Matchmaking uses hidden MMR instead of visible rating for ranked players.
+  use-for-matchmaking: true
+  # When hidden MMR exceeds visible tier rating by this much, apply catch-up on wins.
+  catch-up-threshold: 80
+  catch-up-multiplier: 1.35
+  max-catch-up-bonus: 28
+  # Hidden MMR tracks rating changes but converges toward visible rating over time.
+  convergence-rate: 0.15

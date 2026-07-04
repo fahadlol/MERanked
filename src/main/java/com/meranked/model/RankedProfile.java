@@ -36,6 +36,10 @@ public final class RankedProfile {
     private int upsetWins;
     private double highestBeatenRating;
     private int lossStreak;
+    // Hidden MMR (matchmaking skill estimate, may diverge from visible tier rating)
+    private double hiddenMmr;
+    // Accumulated behavioral nudge during placements
+    private double placementBehaviorBias;
 
     public RankedProfile(UUID uuid, String gamemode) {
         this.uuid = uuid;
@@ -60,6 +64,7 @@ public final class RankedProfile {
         this.decayActive = false;
         this.rankProtection = 0;
         this.seasonId = 1;
+        this.hiddenMmr = 1500;
     }
 
     public UUID uuid() { return uuid; }
@@ -124,6 +129,10 @@ public final class RankedProfile {
     public int placementNetWins() { return placementWins - placementLosses; }
     public int lossStreak() { return lossStreak; }
     public void setLossStreak(int lossStreak) { this.lossStreak = lossStreak; }
+    public double hiddenMmr() { return hiddenMmr <= 0 ? rating : hiddenMmr; }
+    public void setHiddenMmr(double hiddenMmr) { this.hiddenMmr = hiddenMmr; }
+    public double placementBehaviorBias() { return placementBehaviorBias; }
+    public void addPlacementBehaviorBias(double delta) { this.placementBehaviorBias += delta; }
 
     /** Human-readable streak label, e.g. "5 Win Streak" or "2 Loss Streak". */
     public String streakLabel() {

@@ -68,6 +68,10 @@ public final class QueueService {
                     Map.of("reason", banService.banReason(player.getUniqueId())));
             return false;
         }
+        if (plugin.services().punishments().isQueueBanned(player.getUniqueId())) {
+            messages.sendPrefixed(player, "queue.banned", Map.of("reason", "Queue ban"));
+            return false;
+        }
         if (isQueued(player.getUniqueId())) {
             messages.send(player, "queue.already-queued");
             return false;
@@ -95,10 +99,19 @@ public final class QueueService {
             plugin.services().altLock().evaluate(player, profile);
         }
 
-        // Placement players are matched by a hidden difficulty-scaled rating.
-        double matchmakingRating = profile.inPlacements(profileService.placementRequired(gamemode))
-                ? placementScaling.hiddenRating(profile)
-                : profile.rating();
+        // Placement players: hidden difficulty rating + behavioral bias; ranked: hidden MMR when enabled.
+        int required = profileService.placementRequired(gamemode);
+        boolean inPlacements = profile.inPlacements(required);
+        double matchmakingRating;
+        if (inPlacements) {
+            matchmakingRating = plugin.services().placementBehavior().adjustedHiddenRating(profile, placementScaling);
+        } else {
+            matchmakingRating = plugin.services().hiddenMmr().matchmakingRating(profile, false, profile.rating());
+        }
+
+        var rp = profileService.getPlayer(player.getUniqueId());
+        String region = rp.regionHidden() ? "Hidden" : rp.region();
+        int ping = player.getPing();
 
         QueueEntry entry = new QueueEntry(
                 player.getUniqueId(),
@@ -107,7 +120,9 @@ public final class QueueService {
                 profile.ratingDeviation(),
                 confidence,
                 System.currentTimeMillis(),
-                player.getAddress() == null ? null : player.getAddress().getAddress().getHostAddress()
+                player.getAddress() == null ? null : player.getAddress().getAddress().getHostAddress(),
+                region,
+                ping
         );
 
         queues.computeIfAbsent(gamemode, g -> new ArrayList<>()).add(entry);

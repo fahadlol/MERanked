@@ -87,9 +87,46 @@ public final class CinematicService {
             p2.sendActionBar(TextUtil.parse(actionbar));
         }
 
+        showArenaPreview(config, match, p1, p2);
+
         long durationTicks = config.getLong("duration-seconds", 6) * 20;
         BukkitTask task = plugin.tasks().runSyncLater(() -> finish(match.matchId(), onComplete), durationTicks);
         session.task = task;
+    }
+
+    private void showArenaPreview(FileConfiguration config, RankedMatch match, Player p1, Player p2) {
+        if (!config.getBoolean("arena-preview.enabled", true) || match.arenaName() == null) return;
+        var arenaOpt = plugin.services().arenas().getArena(match.arenaName());
+        if (arenaOpt.isEmpty()) return;
+        var arena = arenaOpt.get();
+        String tags = arena.tags().isEmpty() ? "" : String.join(", ", arena.tags());
+        String text = config.getString("arena-preview.format", "")
+                .replace("<arena>", arena.name())
+                .replace("<tags>", tags)
+                .replace("<description>", arena.description() == null ? "" : arena.description());
+
+        if (config.getBoolean("arena-preview.chat-preview", true)) {
+            for (String line : text.split("\n")) {
+                p1.sendMessage(TextUtil.parse(line));
+                p2.sendMessage(TextUtil.parse(line));
+            }
+        }
+        if (config.getBoolean("arena-preview.hologram", true) && arena.spectatorSpawn() != null) {
+            spawnPreviewHologram(match.matchId(), arena.spectatorSpawn(), text);
+        }
+    }
+
+    private void spawnPreviewHologram(String matchId, org.bukkit.Location loc, String text) {
+        try {
+            org.bukkit.entity.TextDisplay display = loc.getWorld().spawn(loc.clone().add(0, 2, 0), org.bukkit.entity.TextDisplay.class);
+            display.text(TextUtil.parse(text.replace("\n", "<newline>")));
+            display.setBillboard(org.bukkit.entity.Display.Billboard.CENTER);
+            CinematicSession session = sessions.get(matchId);
+            if (session != null) session.hologram = display;
+            else display.remove();
+        } catch (Exception ex) {
+            plugin.getLogger().fine("Arena preview hologram failed: " + ex.getMessage());
+        }
     }
 
     public void trySkip(Player player, RankedMatch match) {
@@ -116,6 +153,7 @@ public final class CinematicService {
         CinematicSession session = sessions.remove(matchId);
         if (session == null) return;
         if (session.task != null) session.task.cancel();
+        if (session.hologram != null && !session.hologram.isDead()) session.hologram.remove();
         for (UUID uuid : session.players) {
             Player player = Bukkit.getPlayer(uuid);
             if (player != null) {
@@ -136,6 +174,7 @@ public final class CinematicService {
         private final Set<UUID> skipped = ConcurrentHashMap.newKeySet();
         private final Runnable onComplete;
         private BukkitTask task;
+        private org.bukkit.entity.TextDisplay hologram;
 
         private CinematicSession(String matchId, Set<UUID> players, Runnable onComplete) {
             this.matchId = matchId;

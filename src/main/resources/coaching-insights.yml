@@ -1,0 +1,13 @@
+coaching-insights:
+  enabled: true
+  show-in-chat: true
+  show-in-actionbar: false
+  max-insights: 3
+  templates:
+    damage-low: "<yellow>Tip:</yellow> <gray>You dealt <white><pct>%</white> of opponent damage. Work on trading pressure.</gray>"
+    damage-high: "<green>Tip:</green> <gray>Strong damage output (<white><pct>%</white>). Keep closing fights cleanly.</gray>"
+    totems-high: "<yellow>Tip:</yellow> <gray>You popped <white><count></white> totems — improve defensive positioning.</gray>"
+    totems-low: "<green>Tip:</green> <gray>Efficient totem use (<white><count></white>). Good survival.</gray>"
+    crystals-low: "<gray>Tip: Crystal placement was low (<white><count></white>). Practice off-angle setups.</gray>"
+    ping-high: "<gray>Tip: Your ping was <white><ping>ms</white>. Consider a closer region tag.</gray>"
+    accuracy-low: "<yellow>Tip:</yellow> <gray>Hit accuracy was <white><pct>%</white>. Focus on clean combos.</gray>"

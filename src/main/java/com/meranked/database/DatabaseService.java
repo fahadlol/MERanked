@@ -96,6 +96,7 @@ public final class DatabaseService {
                         decay_active BOOLEAN DEFAULT FALSE,
                         rank_protection INT DEFAULT 0,
                         season_id INT DEFAULT 1,
+                        hidden_mmr DOUBLE DEFAULT 1500,
                         PRIMARY KEY (uuid, gamemode)
                     )
                     """);
@@ -392,8 +393,25 @@ public final class DatabaseService {
                         PRIMARY KEY (uuid, gamemode)
                     )
                     """);
+                stmt.execute("""
+                    CREATE TABLE IF NOT EXISTS ranked_behavior_fingerprints (
+                        uuid VARCHAR(36),
+                        gamemode VARCHAR(32),
+                        avg_cps DOUBLE DEFAULT 0,
+                        avg_dps DOUBLE DEFAULT 0,
+                        samples INT DEFAULT 0,
+                        updated_at BIGINT,
+                        PRIMARY KEY (uuid, gamemode)
+                    )
+                    """);
+                migrateColumns(stmt);
             }
         });
+    }
+
+    private void migrateColumns(Statement stmt) {
+        try { stmt.execute("ALTER TABLE ranked_profiles ADD COLUMN hidden_mmr DOUBLE DEFAULT 1500"); } catch (SQLException ignored) {}
+        try { stmt.execute("ALTER TABLE ranked_match_quality ADD COLUMN matchmaking_reason TEXT"); } catch (SQLException ignored) {}
     }
 
     public Connection getConnection() throws SQLException {
@@ -413,7 +431,9 @@ public final class DatabaseService {
             try (Connection conn = getConnection()) {
                 return function.apply(conn);
             } catch (SQLException ex) {
-                throw new RuntimeException(ex);
+                // Log so transient outages are visible even for fire-and-forget writes whose future is never awaited.
+                plugin.getLogger().severe("Database operation failed: " + ex.getMessage());
+                throw new java.util.concurrent.CompletionException(ex);
             }
         }, executor);
     }

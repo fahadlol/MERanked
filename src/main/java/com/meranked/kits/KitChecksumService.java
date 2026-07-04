@@ -20,10 +20,16 @@ public final class KitChecksumService {
 
     private final MERankedPlugin plugin;
     private final ServiceRegistry services;
+    private final java.util.Map<String, String> expectedCache = new java.util.concurrent.ConcurrentHashMap<>();
+    private static final String NONE = "\u0000none";
 
     public KitChecksumService(MERankedPlugin plugin, ServiceRegistry services) {
         this.plugin = plugin;
         this.services = services;
+    }
+
+    private static String key(UUID uuid, String gamemode) {
+        return uuid + ":" + gamemode;
     }
 
     public boolean enabled() {
@@ -51,6 +57,7 @@ public final class KitChecksumService {
     public void store(UUID uuid, String gamemode, KitService.StoredKit kit) {
         if (!enabled()) return;
         String checksum = compute(kit);
+        expectedCache.put(key(uuid, gamemode), checksum);
         services.database().executeAsync(conn -> {
             int version = 1;
             try (PreparedStatement ps = conn.prepareStatement(
@@ -75,11 +82,33 @@ public final class KitChecksumService {
         });
     }
 
+    /** Loads the expected checksum into memory off the main thread (call ahead of a match). */
+    public void preloadAsync(UUID uuid, String gamemode) {
+        if (!enabled()) return;
+        String cacheKey = key(uuid, gamemode);
+        if (expectedCache.containsKey(cacheKey)) return;
+        services.database().executeAsync(conn -> {
+            String checksum = null;
+            try (PreparedStatement ps = conn.prepareStatement(
+                    "SELECT checksum FROM ranked_kit_checksums WHERE uuid = ? AND gamemode = ?")) {
+                ps.setString(1, uuid.toString());
+                ps.setString(2, gamemode);
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (rs.next()) checksum = rs.getString("checksum");
+                }
+            }
+            expectedCache.put(cacheKey, checksum == null ? NONE : checksum);
+        });
+    }
+
     /** Returns true if the kit is valid (matches stored checksum or none stored yet). */
     public boolean verify(UUID uuid, String gamemode, KitService.StoredKit kit) {
         if (!enabled()) return true;
-        String expected = loadChecksum(uuid, gamemode);
-        if (expected == null) return true; // no baseline yet
+        String expected = expectedCache.computeIfAbsent(key(uuid, gamemode), k -> {
+            String c = loadChecksum(uuid, gamemode);
+            return c == null ? NONE : c;
+        });
+        if (NONE.equals(expected)) return true; // no baseline yet
         String actual = compute(kit);
         if (expected.equals(actual)) return true;
 

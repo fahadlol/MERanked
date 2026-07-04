@@ -4,6 +4,7 @@ general:
   no-permission: "<prefix> <red>You do not have permission.</red>"
   player-not-found: "<prefix> <red>Player not found.</red>"
   reload-success: "<prefix> <green>Configuration reloaded.</green>"
+  reload-blocked: "<prefix> <red>Active matches or kit editors are running. Use /ranked reload force to override.</red>"
   must-be-player: "<prefix> <red>This command is for players only.</red>"
   command-blocked-in-match: "<prefix> <red>That command is blocked during ranked matches.</red>"
 
@@ -37,6 +38,7 @@ match:
   round-title: "<gold><bold>ROUND <round></bold></gold>"
   round-subtitle: "<white><player_score> - <opponent_score></white>"
   match-quality: "<prefix> <gray>Match Quality:</gray> <white><quality>%</white> <dark_gray>-</dark_gray> <gray><reason></gray>"
+  matchmaking-info: "<prefix> <gray>Matched for fairness:</gray> <white><info></white>"
   summary: |
     <gray>Damage Dealt:</gray> <white><damage></white>
     <gray>Totems Popped:</gray> <white><totems></white>

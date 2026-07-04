@@ -2,6 +2,7 @@ package com.meranked.commands;
 
 import com.meranked.bootstrap.ServiceRegistry;
 import com.meranked.model.RankedProfile;
+import com.meranked.staff.PunishmentService;
 import org.bukkit.Bukkit;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
@@ -188,6 +189,104 @@ AdminCommands {
                 yield true;
             }
             case "kit" -> handleKitSub(services, sender, args);
+            case "staff" -> {
+                if (!staffPerm(sender) || !(sender instanceof Player p)) { services.messages().send(sender, "general.no-permission"); yield true; }
+                services.gui().openStaffCenter(p);
+                yield true;
+            }
+            case "note" -> {
+                if (!staffPerm(sender) || !(sender instanceof Player staff)) { services.messages().send(sender, "general.no-permission"); yield true; }
+                if (args.length < 4) yield false;
+                String kind = args[1].toLowerCase();
+                String text = String.join(" ", java.util.Arrays.copyOfRange(args, 3, args.length));
+                if (kind.equals("player")) {
+                    services.staffNotes().addNote(staff.getUniqueId(), "PLAYER",
+                            Bukkit.getOfflinePlayer(args[2]).getUniqueId().toString(), text, "STAFF_ONLY");
+                } else if (kind.equals("match")) {
+                    services.staffNotes().addNote(staff.getUniqueId(), "MATCH", args[2], text, "STAFF_ONLY");
+                } else { yield false; }
+                sender.sendMessage("§aNote added.");
+                yield true;
+            }
+            case "notes" -> {
+                if (!staffPerm(sender)) { services.messages().send(sender, "general.no-permission"); yield true; }
+                if (args.length < 2) yield false;
+                String id = Bukkit.getOfflinePlayer(args[1]).getUniqueId().toString();
+                sender.sendMessage("§6§lNotes for §e" + args[1] + "§6:");
+                for (var n : services.staffNotes().getNotes("PLAYER", id)) sender.sendMessage("§7- " + n.text());
+                yield true;
+            }
+            case "matchnotes" -> {
+                if (!staffPerm(sender)) { services.messages().send(sender, "general.no-permission"); yield true; }
+                if (args.length < 2) yield false;
+                sender.sendMessage("§6§lNotes for match §e" + args[1] + "§6:");
+                for (var n : services.staffNotes().getNotes("MATCH", args[1])) sender.sendMessage("§7- " + n.text());
+                yield true;
+            }
+            case "evidence" -> {
+                if (!staffPerm(sender)) { services.messages().send(sender, "general.no-permission"); yield true; }
+                if (args.length < 2) yield false;
+                UUID staffUuid = sender instanceof Player pl ? pl.getUniqueId() : null;
+                if (args[1].equalsIgnoreCase("player") && args.length >= 3) {
+                    UUID t = Bukkit.getOfflinePlayer(args[2]).getUniqueId();
+                    var bundle = services.evidence().generateForPlayer(staffUuid, t, args[2]);
+                    sender.sendMessage("§a" + services.evidence().textSummary(bundle).replace("\n", " §7| §a"));
+                } else {
+                    var bundle = services.evidence().generateForMatch(staffUuid, args[1]);
+                    sender.sendMessage("§a" + services.evidence().textSummary(bundle).replace("\n", " §7| §a"));
+                }
+                yield true;
+            }
+            case "rollbackpreview" -> {
+                if (!staffPerm(sender) || !(sender instanceof Player p)) { services.messages().send(sender, "general.no-permission"); yield true; }
+                if (args.length < 2) yield false;
+                services.gui().openRollbackPreview(p, args[1]);
+                yield true;
+            }
+            case "lockqueue" -> {
+                if (!sender.hasPermission("meranked.admin")) { services.messages().send(sender, "general.no-permission"); yield true; }
+                String reason = args.length > 1 ? String.join(" ", java.util.Arrays.copyOfRange(args, 1, args.length)) : "maintenance";
+                services.restartProtection().lockQueue(reason);
+                sender.sendMessage("§aQueue locked: " + reason);
+                yield true;
+            }
+            case "unlockqueue" -> {
+                if (!sender.hasPermission("meranked.admin")) { services.messages().send(sender, "general.no-permission"); yield true; }
+                services.restartProtection().unlockQueue();
+                sender.sendMessage("§aQueue unlocked.");
+                yield true;
+            }
+            case "queueban" -> {
+                if (!sender.hasPermission("meranked.punish.rankedban")) { services.messages().send(sender, "general.no-permission"); yield true; }
+                if (args.length < 4) yield false;
+                UUID t = Bukkit.getOfflinePlayer(args[1]).getUniqueId();
+                long dur = parseDuration(args[2]);
+                String reason = String.join(" ", java.util.Arrays.copyOfRange(args, 3, args.length));
+                UUID staffUuid = sender instanceof Player pl ? pl.getUniqueId() : null;
+                services.punishments().punish(t, staffUuid, PunishmentService.Type.QUEUEBAN, reason, dur, null);
+                sender.sendMessage("§aQueue-banned " + args[1] + ".");
+                yield true;
+            }
+            case "unqueueban" -> {
+                if (!sender.hasPermission("meranked.punish.rankedban")) { services.messages().send(sender, "general.no-permission"); yield true; }
+                if (args.length < 2) yield false;
+                sender.sendMessage("§7Use /unpunish <id> to lift a specific queue ban.");
+                yield true;
+            }
+            case "punish" -> {
+                if (!sender.hasPermission("meranked.punish") || !(sender instanceof Player p)) { services.messages().send(sender, "general.no-permission"); yield true; }
+                if (args.length < 2) yield false;
+                services.gui().openPunishType(p, Bukkit.getOfflinePlayer(args[1]).getUniqueId(), args[1]);
+                yield true;
+            }
+            case "unpunish" -> {
+                if (!sender.hasPermission("meranked.unpunish")) { services.messages().send(sender, "general.no-permission"); yield true; }
+                if (args.length < 2) yield false;
+                UUID staffUuid = sender instanceof Player pl ? pl.getUniqueId() : null;
+                services.punishments().unpunish(args[1], staffUuid);
+                sender.sendMessage("§aPunishment revoked.");
+                yield true;
+            }
             default -> false;
         };
     }

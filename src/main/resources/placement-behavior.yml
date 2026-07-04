@@ -1,0 +1,13 @@
+placement-behavior:
+  enabled: true
+  # How much in-match performance nudges hidden placement rating per game (0 = W/L only).
+  per-match-weight: 0.12
+  signals:
+    damage-efficiency: 0.30
+    hit-accuracy: 0.20
+    totem-efficiency: 0.20
+    crystal-usage: 0.15
+    ping-normalized: 0.15
+  # Rating nudge bounds per placement match.
+  max-nudge: 45
+  min-nudge: -45

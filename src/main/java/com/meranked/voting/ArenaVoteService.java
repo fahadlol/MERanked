@@ -132,13 +132,18 @@ public final class ArenaVoteService {
         ItemMeta meta = item.getItemMeta();
         meta.displayName(TextUtil.parse("<gold>" + arena.name() + "</gold>"));
         int votes = (int) session.votes.values().stream().filter(v -> v == index).count();
-        meta.lore(List.of(
-                TextUtil.parse("<gray>Gamemode:</gray> <white>" + session.match.gamemode() + "</white>"),
-                TextUtil.parse("<gray>Votes:</gray> <white>" + votes + "</white>"),
-                TextUtil.parse("<gray>Map:</gray> <white>" + arena.name() + "</white>"),
-                Component.empty(),
-                TextUtil.parse("<yellow>Click to vote.</yellow>")
-        ));
+        List<Component> lore = new ArrayList<>();
+        lore.add(TextUtil.parse("<gray>Gamemode:</gray> <white>" + session.match.gamemode() + "</white>"));
+        if (!arena.tags().isEmpty()) {
+            lore.add(TextUtil.parse("<gray>Tags:</gray> <white>" + String.join(", ", arena.tags()) + "</white>"));
+        }
+        if (arena.description() != null && !arena.description().isEmpty()) {
+            lore.add(TextUtil.parse("<gray>" + arena.description() + "</gray>"));
+        }
+        lore.add(TextUtil.parse("<gray>Votes:</gray> <white>" + votes + "</white>"));
+        lore.add(Component.empty());
+        lore.add(TextUtil.parse("<yellow>Click to vote.</yellow>"));
+        meta.lore(lore);
         item.setItemMeta(meta);
         return item;
     }

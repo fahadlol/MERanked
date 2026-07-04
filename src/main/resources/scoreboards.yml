@@ -1,50 +1,51 @@
 enabled: true
 
 spawn:
-  title: MERanked
+  title: "<gradient:#D6B36A:#7C3AED><bold>MERanked</bold></gradient>"
   lines:
-    - "────────────"
-    - "Player: %player%"
-    - "Region: %region%"
-    - "Season: #%season%"
+    - "<dark_gray>▪▪▪▪▪▪▪▪▪▪▪▪</dark_gray>"
+    - "<gray>Player:</gray> <white>%player%</white>"
+    - "<gray>Region:</gray> <white>%region%</white>"
+    - "<gray>Season:</gray> <gold>#%season%</gold>"
     - ""
-    - "Mace: %mace_tier%"
-    - "Crystal: %crystal_tier%"
-    - "Queue: %queue_status%"
+    - "<gray>Mace:</gray> <white>%mace_tier%</white>"
+    - "<gray>Crystal:</gray> <white>%crystal_tier%</white>"
+    - "<gray>Queue:</gray> <white>%queue_status%</white>"
     - ""
-    - "/ranked"
-    - "────────────"
+    - "<gold>/ranked</gold>"
+    - "<dark_gray>▪▪▪▪▪▪▪▪▪▪▪▪</dark_gray>"
 
 queue:
-  title: IN QUEUE
+  title: "<gradient:#D6B36A:#7C3AED><bold>IN QUEUE</bold></gradient>"
   lines:
-    - "────────────"
-    - "Mode: %gamemode%"
-    - "Time: %queue_time%s"
-    - "Range: ±%range%"
-    - "Status: Searching..."
+    - "<dark_gray>▪▪▪▪▪▪▪▪▪▪▪▪</dark_gray>"
+    - "<gray>Mode:</gray> <white>%gamemode%</white>"
+    - "<gray>Time:</gray> <white>%queue_time%s</white>"
+    - "<gray>Range:</gray> <white>±%range%</white>"
+    - "<gray>Status:</gray> <yellow>Searching...</yellow>"
     - ""
-    - "/ranked leave"
-    - "────────────"
+    - "<gold>/ranked cancel</gold>"
+    - "<dark_gray>▪▪▪▪▪▪▪▪▪▪▪▪</dark_gray>"
 
 match:
-  title: RANKED DUEL
+  title: "<gradient:#D6B36A:#7C3AED><bold>RANKED DUEL</bold></gradient>"
   lines:
-    - "────────────"
-    - "Mode: %gamemode%"
-    - "Opponent: %opponent%"
-    - "Your Tier: %tier%"
-    - "Their Tier: %opponent_tier%"
+    - "<dark_gray>▪▪▪▪▪▪▪▪▪▪▪▪</dark_gray>"
+    - "<gray>Mode:</gray> <white>%gamemode% <dark_gray>(%bo3%)</dark_gray></white>"
+    - "<gray>Opponent:</gray> <white>%opponent%</white>"
+    - "<gray>Your Tier:</gray> <white>%tier%</white>"
+    - "<gray>Their Tier:</gray> <white>%opponent_tier%</white>"
     - ""
-    - "Time: %match_time%"
-    - "Ping: %ping%ms"
+    - "<gray>Rounds:</gray> <green>%player_rounds%</green> <dark_gray>-</dark_gray> <red>%opponent_rounds%</red>"
+    - "<gray>Time:</gray> <white>%match_time%</white>"
+    - "<gray>Ping:</gray> <white>%ping%ms</white>"
     - ""
-    - "Rating: %rating%"
-    - "Potential: +%win_gain% / -%loss_loss%"
-    - "────────────"
+    - "<gray>Rating:</gray> <gold>%rating%</gold>"
+    - "<gray>Potential:</gray> <green>+%win_gain%</green> <dark_gray>/</dark_gray> <red>-%loss_loss%</red>"
+    - "<dark_gray>▪▪▪▪▪▪▪▪▪▪▪▪</dark_gray>"
 
 placement:
   lines:
-    - "Status: #0 Unranked"
-    - "Placements: %played%/%required%"
-    - "Tier: Hidden"
+    - "<gray>Status:</gray> <dark_gray>#0</dark_gray> <white>Unranked</white>"
+    - "<gray>Placements:</gray> <white>%played%/%required%</white>"
+    - "<gray>Tier:</gray> <white>Hidden</white>"

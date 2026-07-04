@@ -1,0 +1,10 @@
+behavior-fingerprint:
+  enabled: true
+  # Minimum ranked matches before fingerprint is trusted.
+  min-matches: 3
+  # Flag when new/suspicious account exceeds this percentile vs stored baseline.
+  smurf-damage-percentile: 85
+  smurf-cps-threshold: 14
+  suspicion-increase: 12
+  alert-severity: "MEDIUM"
+  store-rolling-average: true

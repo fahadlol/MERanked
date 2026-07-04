@@ -39,9 +39,10 @@ public final class TierService {
 
     public String getTierForRating(double rating, boolean unranked) {
         if (unranked) return "#0";
+        final double effective = applyNonlinearBucketing(rating);
         TierDefinition best = tiers.stream()
                 .filter(t -> !t.id().equals("#0"))
-                .filter(t -> rating >= t.minRating() && rating <= t.maxRating())
+                .filter(t -> effective >= t.minRating() && effective <= t.maxRating())
                 .findFirst()
                 .orElse(tiers.get(tiers.size() - 1));
         return best.id();
@@ -89,6 +90,45 @@ public final class TierService {
 
     public List<TierDefinition> allTiers() {
         return List.copyOf(tiers);
+    }
+
+    /**
+     * Snaps rating toward the nearest non-linear bucket center for finer mid-tier granularity.
+     * Buckets are narrower near the population median (inverted-normal width curve).
+     */
+    private double applyNonlinearBucketing(double rating) {
+        FileConfiguration config = configService.get("tiers.yml");
+        if (!config.getBoolean("nonlinear-bucketing.enabled", false)) return rating;
+
+        double center = config.getDouble("nonlinear-bucketing.center-rating", 1500);
+        double minWidth = config.getDouble("nonlinear-bucketing.min-bucket-width", 80);
+        double maxWidth = config.getDouble("nonlinear-bucketing.max-bucket-width", 200);
+        int count = config.getInt("nonlinear-bucketing.bucket-count", 12);
+
+        double[] edges = buildBucketEdges(center, minWidth, maxWidth, count);
+        for (int i = 0; i < edges.length - 1; i++) {
+            if (rating >= edges[i] && rating < edges[i + 1]) {
+                return (edges[i] + edges[i + 1]) / 2.0;
+            }
+        }
+        return rating;
+    }
+
+    private double[] buildBucketEdges(double center, double minWidth, double maxWidth, int count) {
+        double low = 800;
+        double high = 2700;
+        double[] edges = new double[count + 1];
+        double span = high - low;
+        double pos = 0;
+        for (int i = 0; i <= count; i++) {
+            edges[i] = low + pos;
+            if (i == count) break;
+            double t = (pos / span) * 2 - 1; // -1..1 from low to high
+            double width = minWidth + (maxWidth - minWidth) * t * t;
+            pos += width;
+        }
+        edges[count] = high;
+        return edges;
     }
 
     public record TierDefinition(String id, String display, int minRating, int maxRating, int demotionBuffer) {}

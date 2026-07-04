@@ -91,14 +91,23 @@ public final class PunishmentService {
                 if (p.type() == Type.RANKEDBAN) {
                     services.bans().ban(target, p.reason(), staffName(p.staffUuid()), p.endTime());
                     services.queue().removeFromQueue(target);
-                } else if (online != null) {
-                    online.kick(services.messages().format(
-                            cfg.getString("punishments.messages.banned", "").replace("<reason>", p.reason())));
+                } else {
+                    // Full server ban: register with the server ban list so the player cannot rejoin.
+                    String name = Bukkit.getOfflinePlayer(target).getName();
+                    java.util.Date expiry = p.endTime() == 0 ? null : new java.util.Date(p.endTime());
+                    if (name != null) {
+                        Bukkit.getBanList(org.bukkit.BanList.Type.NAME)
+                                .addBan(name, p.reason(), expiry, staffName(p.staffUuid()));
+                    }
+                    if (online != null) {
+                        online.kick(services.messages().format(
+                                cfg.getString("punishments.messages.banned", "").replace("<reason>", p.reason())));
+                    }
                 }
             }
             case KICK -> {
                 if (online != null) online.kick(services.messages().format(
-                        cfg.getString("punishments.messages.banned", "").replace("<reason>", p.reason())));
+                        cfg.getString("punishments.messages.kicked", "").replace("<reason>", p.reason())));
             }
             case QUEUEBAN -> services.queue().removeFromQueue(target);
             default -> {
@@ -116,7 +125,13 @@ public final class PunishmentService {
                 try (ResultSet rs = ps.executeQuery()) {
                     if (rs.next()) {
                         target = UUID.fromString(rs.getString("uuid"));
-                        if ("RANKEDBAN".equals(rs.getString("type"))) services.bans().unban(target);
+                        String type = rs.getString("type");
+                        if ("RANKEDBAN".equals(type)) {
+                            services.bans().unban(target);
+                        } else if ("BAN".equals(type)) {
+                            String name = Bukkit.getOfflinePlayer(target).getName();
+                            if (name != null) Bukkit.getBanList(org.bukkit.BanList.Type.NAME).pardon(name);
+                        }
                     }
                 }
             }
@@ -126,7 +141,11 @@ public final class PunishmentService {
                 ps.executeUpdate();
             }
             if (target != null) {
-                cache.remove(target);
+                List<Punishment> list = cache.get(target);
+                if (list != null) {
+                    list.removeIf(p -> p.punishmentId().equals(punishmentId));
+                    if (list.isEmpty()) cache.remove(target);
+                }
                 logHistory(conn, punishmentId, target, "REVOKED", staff);
             }
         });

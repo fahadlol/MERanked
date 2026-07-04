@@ -120,6 +120,32 @@ public final class RollbackService {
         return done;
     }
 
+    /** Builds a human-readable preview of the exact changes a match rollback would apply. */
+    public Map<String, Object> previewMatch(String matchId) {
+        return database.queryAsync(conn -> {
+            java.util.List<String> lines = new java.util.ArrayList<>();
+            try (PreparedStatement ps = conn.prepareStatement("""
+                SELECT mp.uuid, mp.rating_before, mp.rating_after, mp.tier_before, mp.tier_after, m.gamemode
+                FROM ranked_match_participants mp
+                JOIN ranked_matches m ON m.match_id = mp.match_id
+                WHERE mp.match_id = ?
+                """)) {
+                ps.setString(1, matchId);
+                try (var rs = ps.executeQuery()) {
+                    while (rs.next()) {
+                        String name = org.bukkit.Bukkit.getOfflinePlayer(UUID.fromString(rs.getString("uuid"))).getName();
+                        RankedProfile profile = profileService.getProfile(UUID.fromString(rs.getString("uuid")), rs.getString("gamemode"));
+                        lines.add(name + ": Rating " + Math.round(profile.rating()) + " -> " + Math.round(rs.getDouble("rating_before")));
+                        lines.add(name + ": Tier " + profile.tier() + " -> " + rs.getString("tier_before"));
+                    }
+                }
+            }
+            Map<String, Object> out = new java.util.HashMap<>();
+            out.put("lines", lines);
+            return out;
+        }).join();
+    }
+
     private void logRollback(UUID staff, String reason, String matchId, Map<String, Object> oldValues, Map<String, Object> newValues) {
         database.executeAsync(conn -> {
             try (PreparedStatement ps = conn.prepareStatement("""

@@ -38,6 +38,10 @@ public final class SpectateService {
         FileConfiguration config = configService.get("spectating.yml");
         if (staff && !config.getBoolean("staff-silent.enabled", true)) return false;
         if (!staff && !config.getBoolean("player-spectate.enabled", true)) return false;
+        if (!staff && plugin.services().punishments().isSpectateBanned(spectator.getUniqueId())) {
+            messages.send(spectator, "spectate.not-available");
+            return false;
+        }
 
         Optional<RankedMatch> matchOpt = matchService.getMatchById(matchId);
         if (matchOpt.isEmpty()) {

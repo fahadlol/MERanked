@@ -42,6 +42,14 @@ public final class GuiListener implements Listener {
             case KIT_AUDIT -> handleKitAudit(player, session, event.getRawSlot());
             case TRIM_EDITOR -> handleTrimEditor(player, session, event.getRawSlot());
             case REPLAY -> handleReplay(player, session, event.getRawSlot());
+            case STAFF_CENTER -> handleStaffCenter(player, event.getRawSlot());
+            case ROLLBACK_PREVIEW -> handleRollbackPreview(player, session, event.getRawSlot());
+            case PUNISH_TYPE -> handlePunishType(player, session, event.getRawSlot());
+            case PUNISH_REASON -> handlePunishReason(player, session, event.getRawSlot());
+            case PUNISH_DURATION -> handlePunishDuration(player, session, event.getRawSlot());
+            case PUNISH_CONFIRM -> handlePunishConfirm(player, session, event.getRawSlot());
+            case IDENTITY_CARD -> {}
+            case FAIRNESS_DASHBOARD -> { if (event.getRawSlot() >= 40) player.closeInventory(); }
             default -> {}
         }
     }
@@ -206,5 +214,111 @@ public final class GuiListener implements Listener {
             services.replays().printTimeline(player, session.context());
             player.closeInventory();
         }
+    }
+
+    private void handleStaffCenter(Player player, int slot) {
+        var cfg = services.config().get("staff-center.yml");
+        if (slot == cfg.getInt("staff-center.items.staff-alerts", 12)) { services.gui().openStaffAlerts(player); }
+        else if (slot == cfg.getInt("staff-center.items.watchlist", 14)) { services.gui().openWatchlist(player); }
+        else if (slot == cfg.getInt("staff-center.items.close", 49)) { player.closeInventory(); }
+        else if (slot == cfg.getInt("staff-center.items.suspicious-players", 16)) {
+            player.closeInventory();
+            player.performCommand("ranked suspicious");
+        } else if (slot == cfg.getInt("staff-center.items.live-matches", 10)) {
+            player.closeInventory();
+            player.performCommand("matches");
+        }
+    }
+
+    private void handleRollbackPreview(Player player, GuiSession session, int slot) {
+        String matchId = session.context();
+        switch (slot) {
+            case 20 -> {
+                services.rollback().rollbackMatch(player, matchId, "Rollback preview confirm");
+                player.sendMessage("§aRollback applied for " + matchId + ".");
+                player.closeInventory();
+            }
+            case 22 -> {
+                services.evidence().generateForMatch(player.getUniqueId(), matchId);
+                player.sendMessage("§aEvidence bundle generated.");
+            }
+            case 24 -> player.closeInventory();
+            default -> {}
+        }
+    }
+
+    private void handlePunishType(Player staff, GuiSession session, int slot) {
+        UUID target = UUID.fromString(session.context());
+        String name = session.subContext();
+        var cfg = services.config().get("punishments.yml");
+        var section = cfg.getConfigurationSection("punishments.types");
+        if (slot == cfg.getInt("punishments.history-slot", 22)) {
+            staff.closeInventory();
+            staff.performCommand("history " + name);
+            return;
+        }
+        if (section == null) return;
+        for (String type : section.getKeys(false)) {
+            if (cfg.getInt("punishments.types." + type + ".slot", -1) == slot) {
+                String perm = cfg.getString("punishments.types." + type + ".permission", "meranked.punish");
+                if (!staff.hasPermission(perm)) { staff.sendMessage("§cNo permission for that punishment."); return; }
+                services.gui().openPunishReason(staff, target, name, type);
+                return;
+            }
+        }
+    }
+
+    private void handlePunishReason(Player staff, GuiSession session, int slot) {
+        String[] ctx = session.context().split("\\|", 2);
+        UUID target = UUID.fromString(ctx[0]);
+        String type = ctx[1];
+        String name = session.subContext();
+        var cfg = services.config().get("punishments.yml");
+        java.util.List<String> reasons = cfg.getStringList("punishments.types." + type + ".reasons");
+        if (slot >= 0 && slot < reasons.size()) {
+            services.gui().openPunishDuration(staff, target, name, type, reasons.get(slot));
+        }
+    }
+
+    private void handlePunishDuration(Player staff, GuiSession session, int slot) {
+        String[] ctx = session.context().split("\\|", 3);
+        UUID target = UUID.fromString(ctx[0]);
+        String type = ctx[1];
+        String reason = ctx[2];
+        String name = session.subContext();
+        var cfg = services.config().get("punishments.yml");
+        java.util.List<java.util.Map<?, ?>> durations = cfg.getMapList("punishments.durations");
+        if (slot >= 0 && slot < durations.size()) {
+            var d = durations.get(slot);
+            String label = String.valueOf(d.get("label"));
+            long seconds = ((Number) d.get("seconds")).longValue();
+            if (seconds < 0) {
+                // Custom: default to permanent for simplicity (chat prompt could be added).
+                seconds = 0;
+                label = "Permanent";
+            }
+            services.gui().openPunishConfirm(staff, target, name, type, reason, seconds, label);
+        }
+    }
+
+    private void handlePunishConfirm(Player staff, GuiSession session, int slot) {
+        if (slot == 15) { staff.closeInventory(); return; }
+        if (slot != 11) return;
+        String[] ctx = session.context().split("\\|", 4);
+        UUID target = UUID.fromString(ctx[0]);
+        String type = ctx[1];
+        String reason = ctx[2];
+        long seconds = Long.parseLong(ctx[3]);
+        com.meranked.staff.PunishmentService.Type ptype;
+        try {
+            ptype = com.meranked.staff.PunishmentService.Type.valueOf(type.toUpperCase());
+        } catch (IllegalArgumentException ex) {
+            ptype = com.meranked.staff.PunishmentService.Type.BAN;
+        }
+        services.punishments().punish(target, staff.getUniqueId(), ptype, reason, seconds * 1000L, null);
+        var cfg = services.config().get("punishments.yml");
+        staff.sendMessage(services.messages().format(cfg.getString("punishments.messages.confirm", "")
+                .replace("<player>", session.subContext())));
+        staff.closeInventory();
     }
 }

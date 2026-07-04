@@ -41,6 +41,10 @@ public final class RankedMatch {
     private String matchQualityReason;
     private int queueRange;
     private String upsetLevel;
+    private String matchmakingReason;
+    // Lifecycle guards
+    private boolean hasStarted;   // true once the first round has gone live (FIGHT shown)
+    private boolean finalized;    // true once the match result has been processed exactly once
 
     public RankedMatch(String matchId, String gamemode, UUID player1, UUID player2) {
         this.matchId = matchId;
@@ -98,6 +102,16 @@ public final class RankedMatch {
     public void setQueueRange(int queueRange) { this.queueRange = queueRange; }
     public String upsetLevel() { return upsetLevel; }
     public void setUpsetLevel(String upsetLevel) { this.upsetLevel = upsetLevel; }
+    public String matchmakingReason() { return matchmakingReason; }
+    public void setMatchmakingReason(String matchmakingReason) { this.matchmakingReason = matchmakingReason; }
+    public boolean hasStarted() { return hasStarted; }
+    public void setHasStarted(boolean hasStarted) { this.hasStarted = hasStarted; }
+    /** Returns true only for the first caller; subsequent calls return false (idempotency guard). */
+    public boolean markFinalized() {
+        if (finalized) return false;
+        finalized = true;
+        return true;
+    }
 
     public UUID opponent(UUID player) {
         return player.equals(player1) ? player2 : player1;

@@ -70,6 +70,15 @@ commands:
     description: Accept spectate request
   spectatedeny:
     description: Deny spectate request
+  punish:
+    description: Open punishment GUI
+    permission: meranked.punish
+  history:
+    description: View punishment history
+    permission: meranked.history
+  unpunish:
+    description: Revoke a punishment
+    permission: meranked.unpunish
 permissions:
   meranked.*:
     description: All MERanked permissions
@@ -110,4 +119,28 @@ permissions:
     default: op
   meranked.bypass.queue:
     description: Bypass queue restrictions
+    default: op
+  meranked.staff.center:
+    description: Access the staff command center
+    default: op
+  meranked.punish:
+    description: Use the punishment system
+    default: op
+  meranked.punish.ban:
+    description: Issue bans
+    default: op
+  meranked.punish.mute:
+    description: Issue mutes
+    default: op
+  meranked.punish.kick:
+    description: Issue kicks
+    default: op
+  meranked.punish.rankedban:
+    description: Issue ranked bans
+    default: op
+  meranked.unpunish:
+    description: Revoke punishments
+    default: op
+  meranked.history:
+    description: View punishment history
     default: op

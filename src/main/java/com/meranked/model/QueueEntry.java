@@ -9,7 +9,9 @@ public record QueueEntry(
         double ratingDeviation,
         String confidence,
         long joinedAt,
-        String ip
+        String ip,
+        String region,
+        int ping
 ) {
     public long queueTimeSeconds() {
         return (System.currentTimeMillis() - joinedAt) / 1000;

@@ -73,6 +73,7 @@ punishments:
 
   messages:
     banned: "<prefix> <red>You have been banned: <reason></red>"
+    kicked: "<prefix> <red>You have been kicked: <reason></red>"
     muted: "<prefix> <red>You have been muted: <reason></red>"
     ranked-banned: "<prefix> <red>You have been ranked-banned: <reason></red>"
     confirm: "<prefix> <green>Punishment applied to <player>.</green>"

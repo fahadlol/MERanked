@@ -21,6 +21,7 @@ public final class ListenerRegistrar {
         register(new KitEditorListener(services));
         register(new CombatListener(services));
         register(new CommandBlockListener(services));
+        register(new ChatListener(services));
     }
 
     private void register(Listener listener) {

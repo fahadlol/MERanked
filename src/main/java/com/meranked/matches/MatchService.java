@@ -46,12 +46,20 @@ public final class MatchService {
     }
 
     public void createMatch(String gamemode, UUID player1, UUID player2, int queueRange) {
+        createMatch(gamemode, player1, player2, queueRange, null);
+    }
+
+    public void createMatch(String gamemode, UUID player1, UUID player2, int queueRange, String matchmakingReason) {
         String matchId = IdUtil.newMatchId();
         RankedMatch match = new RankedMatch(matchId, gamemode, player1, player2);
         match.setQueueRange(queueRange);
+        match.setMatchmakingReason(matchmakingReason);
         activeMatches.put(matchId, match);
         playerMatchMap.put(player1, matchId);
         playerMatchMap.put(player2, matchId);
+
+        services.behaviorFingerprint().startMatch(player1, matchId);
+        services.behaviorFingerprint().startMatch(player2, matchId);
 
         ProfileService profiles = services.profiles();
         RankedProfile p1 = profiles.getProfile(player1, gamemode);
@@ -69,6 +77,9 @@ public final class MatchService {
             services.messages().sendPrefixed(bp1, "queue.match-found");
         }
         if (bp2 != null) services.messages().sendPrefixed(bp2, "queue.match-found");
+
+        services.kits().preloadAsync(player1, gamemode);
+        services.kits().preloadAsync(player2, gamemode);
 
         match.setState(RankedMatch.State.VOTING);
         services.arenaVoting().startVoting(match, arena -> {
@@ -148,8 +159,10 @@ public final class MatchService {
     }
 
     private void countdownTick(RankedMatch match, int remaining) {
+        if (match.state() == RankedMatch.State.FINISHED || !activeMatches.containsKey(match.matchId())) return;
         if (remaining <= 0) {
             match.setState(RankedMatch.State.ACTIVE);
+            match.setHasStarted(true);
             for (UUID uuid : List.of(match.player1(), match.player2())) {
                 Player player = Bukkit.getPlayer(uuid);
                 if (player != null) {
@@ -250,11 +263,13 @@ public final class MatchService {
 
     public void handleDisconnect(Player player) {
         getMatch(player.getUniqueId()).ifPresent(match -> {
-            if (match.state().ordinal() < RankedMatch.State.ACTIVE.ordinal()) {
+            // Once the match has gone live (including between Best-of-3 rounds), a disconnect is a full loss.
+            // Before it starts, it is treated as a dodge and the match is cancelled.
+            if (match.hasStarted()) {
+                endMatch(match, match.opponent(player.getUniqueId()), player.getUniqueId(), true);
+            } else {
                 services.antiDodge().recordDodge(player.getUniqueId());
                 cancelMatch(match, "Disconnect before start");
-            } else if (match.state() == RankedMatch.State.ACTIVE) {
-                endMatch(match, match.opponent(player.getUniqueId()), player.getUniqueId(), true);
             }
         });
     }
@@ -270,7 +285,9 @@ public final class MatchService {
     }
 
     public void endMatch(RankedMatch match, UUID winner, UUID loser, boolean disconnect) {
-        if (match.state() == RankedMatch.State.FINISHED || match.state() == RankedMatch.State.ENDING) return;
+        // Idempotency guard: process the result exactly once regardless of current state
+        // (handles between-round ENDING state, simultaneous deaths, disconnect + death races).
+        if (!match.markFinalized()) return;
         match.setState(RankedMatch.State.ENDING);
         match.setWinner(winner);
         match.setLoser(loser);
@@ -291,6 +308,9 @@ public final class MatchService {
         }
 
         computeMatchQuality(match);
+
+        services.behaviorFingerprint().endMatch(match.player1(), match);
+        services.behaviorFingerprint().endMatch(match.player2(), match);
 
         if (!match.noRatingChange()) {
             applyRating(match, winner, loser);
@@ -332,7 +352,7 @@ public final class MatchService {
             upsetBonus = services.upsets().bonusRating(upset, winUpdate.change());
         }
 
-        winProfile.setRating(winUpdate.rating() + upsetBonus);
+        winProfile.setRating(winUpdate.rating() + upsetBonus + services.hiddenMmr().catchUpBonus(winProfile));
         winProfile.setRatingDeviation(winUpdate.rd());
         winProfile.setVolatility(winUpdate.volatility());
 
@@ -350,7 +370,14 @@ public final class MatchService {
         loseProfile.setVolatility(loseUpdate.volatility());
 
         int required = profiles.placementRequired(match.gamemode());
+        Player wPlayer = Bukkit.getPlayer(winner);
+        Player lPlayer = Bukkit.getPlayer(loser);
+        int winPing = wPlayer == null ? 0 : wPlayer.getPing();
+        int losePing = lPlayer == null ? 0 : lPlayer.getPing();
+
         if (winProfile.inPlacements(required)) {
+            services.placementBehavior().recordPlacementMatch(winProfile, match.stats(winner),
+                    match.stats(loser), winPing, true);
             placements.recordPlacementMatch(winProfile, true,
                     Bukkit.getOfflinePlayer(loser).getName(), loseProfile.tier(), loseProfile.rating());
             if (placements.completePlacementsIfReady(winProfile)) {
@@ -371,6 +398,8 @@ public final class MatchService {
         }
 
         if (loseProfile.inPlacements(required)) {
+            services.placementBehavior().recordPlacementMatch(loseProfile, match.stats(loser),
+                    match.stats(winner), losePing, false);
             placements.recordPlacementMatch(loseProfile, false, null, null, winProfile.rating());
             placements.completePlacementsIfReady(loseProfile);
         } else {
@@ -399,6 +428,13 @@ public final class MatchService {
 
         profiles.queueSave(winProfile);
         profiles.queueSave(loseProfile);
+
+        if (!winProfile.inPlacements(required)) {
+            services.hiddenMmr().afterRatingChange(winProfile, winnerRatingBefore, winProfile.rating(), true);
+        }
+        if (!loseProfile.inPlacements(required)) {
+            services.hiddenMmr().afterRatingChange(loseProfile, loserRatingBefore, loseProfile.rating(), false);
+        }
 
         services.suspicion().checkRatingSpike(winner, winUpdate.change());
     }
@@ -429,7 +465,7 @@ public final class MatchService {
                 .evaluate(match, p1, p2, ping1, ping2, recent);
         match.setMatchQuality(result.quality());
         match.setMatchQualityReason(result.reason());
-        services.matchQuality().store(match.matchId(), result);
+        services.matchQuality().store(match.matchId(), result, match.matchmakingReason());
     }
 
     private void showPlacementRecap(Player player, RankedProfile profile) {
@@ -471,6 +507,7 @@ public final class MatchService {
             }
             sendMatchSummary(w, match, winner, winChange);
             sendProgressAndDemotion(w, winner, match.gamemode());
+            sendCoachingInsights(w, match, winner);
         }
         if (l != null) {
             if (!match.noRatingChange()) {
@@ -480,6 +517,18 @@ public final class MatchService {
             }
             sendMatchSummary(l, match, loser, loseChange);
             sendProgressAndDemotion(l, loser, match.gamemode());
+            sendCoachingInsights(l, match, loser);
+        }
+    }
+
+    private void sendCoachingInsights(Player player, RankedMatch match, UUID uuid) {
+        if (player == null || !services.coachingInsights().enabled()) return;
+        FileConfiguration cfg = services.config().get("coaching-insights.yml");
+        if (!cfg.getBoolean("coaching-insights.show-in-chat", true)) return;
+        int ping = player.getPing();
+        for (String line : services.coachingInsights().insights(match, uuid, ping)) {
+            if (line == null || line.isBlank()) continue;
+            player.sendMessage(services.messages().format(line));
         }
     }
 
@@ -542,6 +591,10 @@ public final class MatchService {
             player.sendMessage(services.messages().format(services.messages().raw("match.match-quality")
                     .replace("<quality>", String.valueOf(match.matchQuality()))
                     .replace("<reason>", match.matchQualityReason() == null ? "" : match.matchQualityReason())));
+        }
+        if (match.matchmakingReason() != null && !match.matchmakingReason().isBlank()) {
+            player.sendMessage(services.messages().format(services.messages().raw("match.matchmaking-info")
+                    .replace("<info>", match.matchmakingReason())));
         }
     }
 

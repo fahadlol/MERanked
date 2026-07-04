@@ -126,6 +126,13 @@ public final class ArenaService {
                 autoDisableArena(arena, "Regeneration failed");
             }
             plugin.tasks().runSync(onComplete);
+        }).exceptionally(ex -> {
+            // Never leave a match hanging if regeneration throws: mark failed, disable, still run the callback.
+            plugin.getLogger().severe("Arena regeneration threw for " + arena.name() + ": " + ex.getMessage());
+            arena.setLastRegenResult("FAILED");
+            autoDisableArena(arena, "Regeneration error");
+            plugin.tasks().runSync(onComplete);
+            return null;
         });
     }
 
@@ -203,6 +210,8 @@ public final class ArenaService {
         data.put("cloneSource", locToMap(arena.cloneSource()));
         data.put("regenMethod", arena.regenMethod());
         data.put("brokenReason", arena.brokenReason());
+        data.put("tags", new ArrayList<>(arena.tags()));
+        data.put("description", arena.description());
         return gson.toJson(data);
     }
 
@@ -232,6 +241,10 @@ public final class ArenaService {
         arena.setCloneSource(mapToLoc((Map<String, Object>) data.get("cloneSource")));
         if (data.get("regenMethod") != null) arena.setRegenMethod(String.valueOf(data.get("regenMethod")));
         if (data.get("brokenReason") != null) arena.setBrokenReason(String.valueOf(data.get("brokenReason")));
+        if (data.get("tags") instanceof List<?> list) {
+            arena.setTags(new HashSet<>(list.stream().map(String::valueOf).toList()));
+        }
+        if (data.get("description") != null) arena.setDescription(String.valueOf(data.get("description")));
         return arena;
     }
 

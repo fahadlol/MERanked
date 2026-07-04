@@ -21,4 +21,19 @@ prefer:
   different-recent-opponent: true
   different-ip: true
 
+# Pick the candidate pair with highest predicted match quality (not just closest rating).
+quality-maximizing:
+  enabled: true
+  min-quality-percent: 40
+
+region:
+  enabled: true
+  prefer-same-region: true
+  max-cross-region-ping: 150
+  relax-after-seconds: 45
+  hard-ping-cap: 250
+
 tick-interval-ms: 500
+
+# Seconds before the same two players can be matched again (prevents instant rematches).
+rematch-cooldown-seconds: 30

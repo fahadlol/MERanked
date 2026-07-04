@@ -64,8 +64,11 @@ public final class ScoreboardService {
         ph.put("season", String.valueOf(services.seasons().currentSeasonId()));
         ph.put("mace_tier", services.placements().displayTier(mace));
         ph.put("crystal_tier", services.placements().displayTier(crystal));
-        ph.put("mace_progress", mace.ranked() ? com.meranked.util.TextUtil.stripToLegacy(services.rankProgress().buildBar(mace)) : "");
-        ph.put("crystal_progress", crystal.ranked() ? com.meranked.util.TextUtil.stripToLegacy(services.rankProgress().buildBar(crystal)) : "");
+        boolean needsProgress = lines.stream().anyMatch(l -> l.contains("%mace_progress%") || l.contains("%crystal_progress%"));
+        if (needsProgress) {
+            ph.put("mace_progress", mace.ranked() ? com.meranked.util.TextUtil.stripToLegacy(services.rankProgress().buildBar(mace)) : "");
+            ph.put("crystal_progress", crystal.ranked() ? com.meranked.util.TextUtil.stripToLegacy(services.rankProgress().buildBar(crystal)) : "");
+        }
         ph.put("queue_status", services.queue().isQueued(player.getUniqueId()) ? "In Queue" : "Idle");
         setBoard(player, config.getString("spawn.title", "MERanked"), lines, ph);
     }
@@ -108,20 +111,68 @@ public final class ScoreboardService {
         setBoard(player, config.getString("match.title", "RANKED DUEL"), config.getStringList("match.lines"), ph);
     }
 
-    private void setBoard(Player player, String title, List<String> lines, Map<String, String> placeholders) {
-        Scoreboard board = Bukkit.getScoreboardManager().getNewScoreboard();
-        Objective obj = board.registerNewObjective("meranked", Criteria.DUMMY, com.meranked.util.TextUtil.parse(title));
-        obj.setDisplaySlot(DisplaySlot.SIDEBAR);
+    private final Map<UUID, Scoreboard> boards = new HashMap<>();
 
-        int score = lines.size();
-        for (String line : lines) {
-            String resolved = line;
-            for (Map.Entry<String, String> e : placeholders.entrySet()) {
-                resolved = resolved.replace("%" + e.getKey() + "%", e.getValue());
-            }
-            Score s = obj.getScore(resolved.length() > 40 ? resolved.substring(0, 40) : resolved);
-            s.setScore(score--);
+    private static final String[] ENTRIES = buildEntries();
+
+    private static String[] buildEntries() {
+        org.bukkit.ChatColor[] colors = org.bukkit.ChatColor.values();
+        String[] entries = new String[Math.min(15, colors.length)];
+        for (int i = 0; i < entries.length; i++) {
+            entries[i] = colors[i].toString();
         }
-        player.setScoreboard(board);
+        return entries;
+    }
+
+    /**
+     * Renders the sidebar for a player. Reuses a single {@link Scoreboard} per player and updates lines
+     * through teams so updates are flicker-free and allocation-free (safe for 100+ concurrent players).
+     */
+    private void setBoard(Player player, String title, List<String> lines, Map<String, String> placeholders) {
+        Scoreboard board = boards.get(player.getUniqueId());
+        Objective obj;
+        if (board == null) {
+            board = Bukkit.getScoreboardManager().getNewScoreboard();
+            obj = board.registerNewObjective("meranked", Criteria.DUMMY, com.meranked.util.TextUtil.parse(title));
+            obj.setDisplaySlot(DisplaySlot.SIDEBAR);
+            boards.put(player.getUniqueId(), board);
+        } else {
+            obj = board.getObjective("meranked");
+            if (obj == null) {
+                obj = board.registerNewObjective("meranked", Criteria.DUMMY, com.meranked.util.TextUtil.parse(title));
+                obj.setDisplaySlot(DisplaySlot.SIDEBAR);
+            } else {
+                obj.displayName(com.meranked.util.TextUtil.parse(title));
+            }
+        }
+        if (player.getScoreboard() != board) player.setScoreboard(board);
+
+        int count = Math.min(lines.size(), ENTRIES.length);
+        for (int i = count; i < ENTRIES.length; i++) {
+            String entry = ENTRIES[i];
+            board.resetScores(entry);
+            Team stale = board.getTeam("l" + i);
+            if (stale != null) stale.unregister();
+        }
+        for (int i = 0; i < count; i++) {
+            String resolved = lines.get(i);
+            for (Map.Entry<String, String> e : placeholders.entrySet()) {
+                resolved = resolved.replace("%" + e.getKey() + "%", e.getValue() == null ? "" : e.getValue());
+            }
+            String entry = ENTRIES[i];
+            Team team = board.getTeam("l" + i);
+            if (team == null) {
+                team = board.registerNewTeam("l" + i);
+                team.addEntry(entry);
+            }
+            team.prefix(com.meranked.util.TextUtil.parse(resolved));
+            Score s = obj.getScore(entry);
+            if (s.getScore() != count - i) s.setScore(count - i);
+        }
+    }
+
+    /** Releases the cached scoreboard for a player who has left the server. */
+    public void remove(Player player) {
+        boards.remove(player.getUniqueId());
     }
 }

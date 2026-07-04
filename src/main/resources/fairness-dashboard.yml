@@ -1,0 +1,9 @@
+fairness-dashboard:
+  enabled: true
+  title: "<gradient:#D6B36A:#7C3AED><bold>Match Fairness</bold></gradient>"
+  size: 45
+  pledge: |
+    <gray>MERanked matches are made for</gray> <gold>fairness</gold><gray>, not engagement manipulation.</gray>
+    <gray>We never optimize for streaks, retention, or forced losses.</gray>
+    <gray>Match quality reflects rating, confidence, ping, and queue time only.</gray>
+  history-size: 8

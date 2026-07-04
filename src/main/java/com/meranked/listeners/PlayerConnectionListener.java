@@ -16,19 +16,22 @@ public final class PlayerConnectionListener implements Listener {
 
     @EventHandler
     public void onJoin(PlayerJoinEvent event) {
-        services.profiles().ensurePlayer(event.getPlayer());
+        services.profiles().preloadAsync(event.getPlayer().getUniqueId(), event.getPlayer().getName());
         event.getPlayer().getInventory().setItem(8, services.kitEditor().createEditorItem());
     }
 
     @EventHandler
     public void onQuit(PlayerQuitEvent event) {
-        if (services.kitEditor().isEditing(event.getPlayer().getUniqueId())) {
+        java.util.UUID uuid = event.getPlayer().getUniqueId();
+        if (services.kitEditor().isEditing(uuid)) {
             services.kitEditor().leaveEditor(event.getPlayer());
         }
-        if (services.queue().isQueued(event.getPlayer().getUniqueId())) {
-            services.queue().leaveQueue(event.getPlayer().getUniqueId());
+        if (services.queue().isQueued(uuid)) {
+            services.queue().leaveQueue(uuid);
         }
         services.matches().handleDisconnect(event.getPlayer());
-        services.matches().handleLeaveDuringMatch(event.getPlayer());
+        services.scoreboards().remove(event.getPlayer());
+        services.profiles().flushNow();
+        services.profiles().unloadPlayer(uuid);
     }
 }

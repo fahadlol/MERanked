@@ -83,3 +83,11 @@ confidence:
     min-rd: 0
     max-rd: 79
     display: "Locked In"
+
+# Non-linear tier bucketing: narrower bands near the median for finer mid-tier progression.
+nonlinear-bucketing:
+  enabled: true
+  center-rating: 1500
+  min-bucket-width: 80
+  max-bucket-width: 200
+  bucket-count: 12

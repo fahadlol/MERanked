@@ -87,6 +87,12 @@ public final class RankProgressService {
                     .replace("<rating>", String.valueOf(Math.round(profile.rating())));
         }
         TierService.TierDefinition next = nextTier(profile.tier());
+        if (next == null) {
+            return cfg.getString("rank-progress.max-tier-format", "<gold><tier></gold> <bar> <white><rating></white>")
+                    .replace("<tier>", profile.tier())
+                    .replace("<bar>", buildBar(profile))
+                    .replace("<rating>", String.valueOf(Math.round(profile.rating())));
+        }
         return cfg.getString("rank-progress.chat-format", "")
                 .replace("<tier>", profile.tier())
                 .replace("<bar>", buildBar(profile))
