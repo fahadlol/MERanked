@@ -23,6 +23,12 @@ public final class WebsiteApiService extends NanoHTTPD {
     private final ServiceRegistry services;
     private final Gson gson = new GsonBuilder().setPrettyPrinting().create();
     private boolean running;
+    private final Map<String, RateWindow> rateWindows = new java.util.concurrent.ConcurrentHashMap<>();
+
+    private static final class RateWindow {
+        long windowStartMs;
+        int count;
+    }
 
     public WebsiteApiService(MERankedPlugin plugin, ConfigService configService, ServiceRegistry services) {
         super(configService.get("website.yml").getString("host", "0.0.0.0"),
@@ -56,6 +62,10 @@ public final class WebsiteApiService extends NanoHTTPD {
         String uri = URLDecoder.decode(session.getUri(), StandardCharsets.UTF_8);
         FileConfiguration config = configService.get("website.yml");
 
+        if (uri.startsWith("/api/") && isRateLimited(session, config)) {
+            return json(Response.Status.TOO_MANY_REQUESTS, Map.of("error", "Rate limit exceeded"));
+        }
+
         if (config.getBoolean("serve-website", true) && !uri.startsWith("/api/")) {
             Response staticResponse = serveStatic(uri);
             if (staticResponse != null) return staticResponse;
@@ -82,7 +92,8 @@ public final class WebsiteApiService extends NanoHTTPD {
             ));
         }
         if (uri.equals("/api/top10")) {
-            String mode = services.profiles().enabledGamemodes().get(0);
+            var modes = services.profiles().enabledGamemodes();
+            String mode = modes.isEmpty() ? "Mace" : modes.get(0);
             return json(Response.Status.OK, services.leaderboard().getTop(mode, 10));
         }
         if (uri.equals("/api/matches/live")) return json(Response.Status.OK, liveMatches());
@@ -234,6 +245,23 @@ public final class WebsiteApiService extends NanoHTTPD {
             ));
         }
         return list;
+    }
+
+    private boolean isRateLimited(IHTTPSession session, FileConfiguration config) {
+        if (!config.getBoolean("rate-limit.enabled", true)) return false;
+        int limit = config.getInt("rate-limit.requests-per-minute", 120);
+        String key = session.getHeaders().getOrDefault("remote-addr", session.getRemoteIpAddress());
+        if (key == null) key = "unknown";
+        long now = System.currentTimeMillis();
+        RateWindow window = rateWindows.computeIfAbsent(key, k -> new RateWindow());
+        synchronized (window) {
+            if (now - window.windowStartMs >= 60_000L) {
+                window.windowStartMs = now;
+                window.count = 0;
+            }
+            window.count++;
+            return window.count > limit;
+        }
     }
 
     private Response json(Response.IStatus status, Object data) {

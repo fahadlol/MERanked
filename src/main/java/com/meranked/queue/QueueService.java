@@ -127,6 +127,10 @@ public final class QueueService {
 
         queues.computeIfAbsent(gamemode, g -> new ArrayList<>()).add(entry);
         messages.sendPrefixed(player, "queue.joined", Map.of("gamemode", gamemode));
+        if (!plugin.services().kits().hasKit(player.getUniqueId(), gamemode)) {
+            messages.sendPrefixed(player, "kit-editor.empty", Map.of("gamemode", gamemode));
+            plugin.tasks().runSyncLater(() -> plugin.services().kitEditor().enterEditor(player, gamemode), 5L);
+        }
         return true;
     }
 

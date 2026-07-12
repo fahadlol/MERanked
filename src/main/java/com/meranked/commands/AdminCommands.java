@@ -3,6 +3,7 @@ package com.meranked.commands;
 import com.meranked.bootstrap.ServiceRegistry;
 import com.meranked.model.RankedProfile;
 import com.meranked.staff.PunishmentService;
+import com.meranked.util.DurationUtil;
 import org.bukkit.Bukkit;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
@@ -157,6 +158,7 @@ AdminCommands {
                 yield true;
             }
             case "watchlist" -> {
+                if (!staffPerm(sender)) { services.messages().send(sender, "general.no-permission"); yield true; }
                 if (sender instanceof Player p) services.gui().openWatchlist(p);
                 yield true;
             }
@@ -270,7 +272,10 @@ AdminCommands {
             case "unqueueban" -> {
                 if (!sender.hasPermission("meranked.punish.rankedban")) { services.messages().send(sender, "general.no-permission"); yield true; }
                 if (args.length < 2) yield false;
-                sender.sendMessage("§7Use /unpunish <id> to lift a specific queue ban.");
+                UUID target = Bukkit.getOfflinePlayer(args[1]).getUniqueId();
+                UUID staffUuid = sender instanceof Player pl ? pl.getUniqueId() : null;
+                int lifted = services.punishments().liftQueueBans(target, staffUuid);
+                sender.sendMessage("§aLifted " + lifted + " queue ban(s) for " + args[1] + ".");
                 yield true;
             }
             case "punish" -> {
@@ -399,14 +404,10 @@ AdminCommands {
     }
 
     private static boolean isDuration(String input) {
-        return input.matches("\\d+[smhd]?");
+        return DurationUtil.isDuration(input);
     }
 
     private static long parseDuration(String input) {
-        if (input.endsWith("d")) return Long.parseLong(input.replace("d", "")) * 86400000L;
-        if (input.endsWith("m")) return Long.parseLong(input.replace("m", "")) * 60000L;
-        if (input.endsWith("h")) return Long.parseLong(input.replace("h", "")) * 3600000L;
-        if (input.endsWith("s")) return Long.parseLong(input.replace("s", "")) * 1000L;
-        return Long.parseLong(input) * 1000L;
+        return DurationUtil.parseMillis(input);
     }
 }

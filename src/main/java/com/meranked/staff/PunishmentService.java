@@ -11,6 +11,7 @@ import java.sql.ResultSet;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -33,9 +34,9 @@ public final class PunishmentService {
         this.services = services;
     }
 
-    public void loadAll() {
+    public CompletableFuture<Void> loadAll() {
         cache.clear();
-        services.database().executeAsync(conn -> {
+        return services.database().executeAsync(conn -> {
             try (PreparedStatement ps = conn.prepareStatement(
                     "SELECT * FROM ranked_punishments WHERE active = TRUE");
                  ResultSet rs = ps.executeQuery()) {
@@ -114,6 +115,16 @@ public final class PunishmentService {
                 // MUTE / CHATMUTE / SPECTATEBAN handled at usage points via isMuted / isSpectateBanned
             }
         }
+    }
+
+    public int liftQueueBans(UUID target, UUID staff) {
+        List<Punishment> active = cache.getOrDefault(target, List.of()).stream()
+                .filter(p -> p.type() == Type.QUEUEBAN && p.isActive())
+                .toList();
+        for (Punishment p : active) {
+            unpunish(p.punishmentId(), staff);
+        }
+        return active.size();
     }
 
     public void unpunish(String punishmentId, UUID staff) {
