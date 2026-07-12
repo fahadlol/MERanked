@@ -48,11 +48,11 @@ public final class PlayerSettingsService {
     public void save(PlayerSettings settings) {
         cache.put(settings.uuid(), settings);
         database.executeAsync(conn -> {
-            try (PreparedStatement ps = conn.prepareStatement("""
+            try (PreparedStatement ps = conn.prepareStatement(database.sql("""
                 INSERT OR REPLACE INTO ranked_player_settings
                 (uuid, messages_enabled, spectate_requests, queue_notifications, region_hidden)
                 VALUES (?,?,?,?,?)
-                """)) {
+                """))) {
                 ps.setString(1, settings.uuid().toString());
                 ps.setBoolean(2, settings.messagesEnabled());
                 ps.setBoolean(3, settings.spectateRequestsEnabled());

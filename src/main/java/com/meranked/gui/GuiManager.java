@@ -36,6 +36,9 @@ public final class GuiManager {
     private final ConfigService configService;
     private final TierService tierService;
     private final Map<UUID, GuiSession> openSessions = new ConcurrentHashMap<>();
+    private final Map<UUID, PendingPunishInput> pendingPunishDuration = new ConcurrentHashMap<>();
+
+    public record PendingPunishInput(UUID target, String targetName, String type, String reason) {}
 
     public GuiManager(MERankedPlugin plugin, ServiceRegistry services) {
         this.plugin = plugin;
@@ -54,6 +57,24 @@ public final class GuiManager {
 
     public void clearSession(Player player) {
         openSessions.remove(player.getUniqueId());
+    }
+
+    public void requestCustomPunishDuration(Player staff, UUID target, String targetName, String type, String reason) {
+        pendingPunishDuration.put(staff.getUniqueId(), new PendingPunishInput(target, targetName, type, reason));
+        staff.closeInventory();
+        staff.sendMessage("§eType punishment duration in chat (e.g. §71d§e, §712h§e, §730m§e, §7permanent§e). Type §7cancel§e to abort.");
+    }
+
+    public PendingPunishInput pollPendingPunishDuration(UUID staff) {
+        return pendingPunishDuration.remove(staff);
+    }
+
+    public boolean hasPendingPunishDuration(UUID staff) {
+        return pendingPunishDuration.containsKey(staff);
+    }
+
+    public void cancelPendingPunishDuration(UUID staff) {
+        pendingPunishDuration.remove(staff);
     }
 
     public void openRankedMenu(Player player) {
@@ -79,10 +100,13 @@ public final class GuiManager {
     }
 
     public void openProfile(Player player, String gamemode) {
-        if (gamemode == null || gamemode.isEmpty()) gamemode = services.profiles().enabledGamemodes().get(0);
+        var modes = services.profiles().enabledGamemodes();
+        if (gamemode == null || gamemode.isEmpty()) {
+            gamemode = modes.isEmpty() ? "Mace" : modes.get(0);
+        }
         RankedProfile p = services.profiles().getProfile(player.getUniqueId(), gamemode);
         var rp = services.profiles().getPlayer(player.getUniqueId());
-        Inventory inv = Bukkit.createInventory(null, 54, TextUtil.parse("<gradient:#D6B36A:#7C3AED><bold>Profile</bold></gradient>"));
+        Inventory inv = Bukkit.createInventory(null, 54, TextUtil.parse("<gradient:#D6B36A:#7C3AED><bold>Profile — " + gamemode + "</bold></gradient>"));
         inv.setItem(4, item(Material.PLAYER_HEAD, "<gold>" + player.getName() + "</gold>",
                 "Region: " + (rp.regionHidden() ? "Hidden" : rp.region())));
         inv.setItem(20, item(Material.IRON_SWORD, "Current", p.tier() + " — " + Math.round(p.rating())));
@@ -103,6 +127,13 @@ public final class GuiManager {
                         "Safe Rating: " + services.rankProgress().safeRating(p) + "+"));
             }
         }
+        int gSlot = 45;
+        for (String mode : modes) {
+            if (gSlot > 53) break;
+            Material icon = mode.equals(gamemode) ? Material.LIME_DYE : Material.GRAY_DYE;
+            inv.setItem(gSlot++, item(icon, "<gold>" + mode + "</gold>", mode.equals(gamemode) ? "Viewing" : "Click to switch"));
+        }
+        inv.setItem(49, item(Material.BARRIER, "<red>Back</red>", "Return to ranked menu"));
         setSession(player, GuiSession.of(GuiType.PROFILE, gamemode));
         player.openInventory(inv);
     }
@@ -166,11 +197,13 @@ public final class GuiManager {
             meta.displayName(TextUtil.parse("<gold>" + e.name() + "</gold>"));
             meta.lore(List.of(
                     TextUtil.parse("<gray>Reason: " + e.reason() + "</gray>"),
-                    TextUtil.parse("<gray>By: " + e.addedBy() + "</gray>")
+                    TextUtil.parse("<gray>By: " + e.addedBy() + "</gray>"),
+                    TextUtil.parse("<red>Click to remove</red>")
             ));
             skull.setItemMeta(meta);
             inv.setItem(i++, skull);
         }
+        inv.setItem(49, item(Material.BARRIER, "<red>Close</red>", "Close watchlist"));
         setSession(staff, GuiSession.of(GuiType.WATCHLIST));
         staff.openInventory(inv);
     }
@@ -253,7 +286,8 @@ public final class GuiManager {
     }
 
     public void openLeaderboard(Player player, String gamemode) {
-        if (gamemode == null) gamemode = services.profiles().enabledGamemodes().get(0);
+        var modes = services.profiles().enabledGamemodes();
+        if (gamemode == null) gamemode = modes.isEmpty() ? "Mace" : modes.get(0);
         Inventory inv = Bukkit.createInventory(null, 54, TextUtil.parse("<gold>Leaderboard — " + gamemode + "</gold>"));
         int slot = 0;
         for (LeaderboardService.LeaderboardEntry e : services.leaderboard().getTop(gamemode, 10)) {
@@ -262,6 +296,13 @@ public final class GuiManager {
                     e.tier() + " — " + Math.round(e.rating()),
                     e.wins() + "W / " + e.losses() + "L"));
         }
+        int gSlot = 45;
+        for (String mode : modes) {
+            if (gSlot > 53) break;
+            Material icon = mode.equals(gamemode) ? Material.LIME_DYE : Material.GRAY_DYE;
+            inv.setItem(gSlot++, item(icon, "<gold>" + mode + "</gold>", mode.equals(gamemode) ? "Viewing" : "Click to switch"));
+        }
+        inv.setItem(49, item(Material.BARRIER, "<red>Back</red>", "Return to ranked menu"));
         setSession(player, GuiSession.of(GuiType.LEADERBOARD, gamemode));
         player.openInventory(inv);
     }
@@ -364,6 +405,7 @@ public final class GuiManager {
         inv.setItem(33, item(Material.PAPER, "<gold>Season Rank</gold>", seasonRank <= 0 ? "Unranked" : "#" + seasonRank));
         inv.setItem(38, item(Material.BOOK, "<gold>Win Rate</gold>", rate + "%"));
         inv.setItem(42, item(Material.BLAZE_POWDER, "<gold>Current Streak</gold>", bestStreak + "W"));
+        inv.setItem(40, item(Material.BARRIER, "<red>Close</red>", "Close identity card"));
         setSession(viewer, GuiSession.of(GuiType.IDENTITY_CARD, target.toString()));
         viewer.openInventory(inv);
     }

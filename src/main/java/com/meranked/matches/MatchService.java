@@ -601,11 +601,11 @@ public final class MatchService {
     private void saveParticipantsAsync(RankedMatch match) {
         services.database().executeAsync(conn -> {
             for (UUID uuid : List.of(match.player1(), match.player2())) {
-                try (PreparedStatement ps = conn.prepareStatement("""
+                try (PreparedStatement ps = conn.prepareStatement(services.database().sql("""
                     INSERT OR REPLACE INTO ranked_match_participants
                     (match_id, uuid, rating_before, rating_after, tier_before, tier_after, rating_change, ping)
                     VALUES (?,?,?,?,?,?,?,?)
-                    """)) {
+                    """))) {
                     double before = match.ratingBefore().getOrDefault(uuid, 0.0);
                     double after = match.ratingAfter().getOrDefault(uuid, before);
                     Player p = Bukkit.getPlayer(uuid);
@@ -667,12 +667,12 @@ public final class MatchService {
     private void saveMatchAsync(RankedMatch match) {
         DatabaseService db = services.database();
         db.executeAsync(conn -> {
-            try (PreparedStatement ps = conn.prepareStatement("""
+            try (PreparedStatement ps = conn.prepareStatement(db.sql("""
                 INSERT OR REPLACE INTO ranked_matches
                 (match_id, gamemode, arena, winner, loser, duration, started_at, ended_at,
                  no_rating, no_rating_reason, dodge, season_id)
                 VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
-                """)) {
+                """))) {
                 ps.setString(1, match.matchId());
                 ps.setString(2, match.gamemode());
                 ps.setString(3, match.arenaName());

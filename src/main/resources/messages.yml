@@ -78,6 +78,7 @@ cinematic:
 kit-editor:
   entered: "<prefix> <gray>Editing kit for <gamemode>...</gray>"
   saved: "<prefix> <green>Kit saved for <gamemode>.</green>"
+  empty: "<prefix> <yellow>Your <gamemode> kit is empty. Opening the kit editor — save before queuing again.</yellow>"
   reverted: "<prefix> <yellow>Changes reverted.</yellow>"
   left: "<prefix> <gray>Left kit editor.</gray>"
   illegal-item: "<prefix> <red>Illegal item detected. Kit not saved.</red>"

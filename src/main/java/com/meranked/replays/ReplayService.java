@@ -59,9 +59,9 @@ public final class ReplayService {
         data.put("stats", match.allStats());
 
         database.executeAsync(conn -> {
-            try (PreparedStatement ps = conn.prepareStatement("""
+            try (PreparedStatement ps = conn.prepareStatement(database.sql("""
                 INSERT OR REPLACE INTO ranked_replays (match_id, data, created_at) VALUES (?, ?, ?)
-                """)) {
+                """))) {
                 ps.setString(1, match.matchId());
                 ps.setString(2, gson.toJson(data));
                 ps.setLong(3, System.currentTimeMillis());

@@ -73,10 +73,10 @@ public final class KitService {
         String armorData = ItemSerializer.toBase64(armor);
         String enderData = ItemSerializer.toBase64(kit.enderChest());
         database.executeAsync(conn -> {
-            try (PreparedStatement ps = conn.prepareStatement("""
+            try (PreparedStatement ps = conn.prepareStatement(database.sql("""
                 INSERT OR REPLACE INTO ranked_kits (uuid, gamemode, kit_data, ender_chest_data, updated_at)
                 VALUES (?, ?, ?, ?, ?)
-                """)) {
+                """))) {
                 ps.setString(1, uuid.toString());
                 ps.setString(2, gamemode);
                 ps.setString(3, invData + "||" + armorData);

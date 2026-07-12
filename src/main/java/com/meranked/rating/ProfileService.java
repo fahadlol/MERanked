@@ -46,7 +46,12 @@ public final class ProfileService {
     }
 
     public RankedPlayer getPlayer(UUID uuid) {
-        return playerCache.computeIfAbsent(uuid, this::loadPlayerSync);
+        return playerCache.computeIfAbsent(uuid, id -> {
+            RankedPlayer loaded = loadPlayerSync(id);
+            if (loaded != null) return loaded;
+            String name = org.bukkit.Bukkit.getOfflinePlayer(id).getName();
+            return RankedPlayer.create(id, name != null ? name : "Unknown");
+        });
     }
 
     public void ensurePlayer(Player player) {
@@ -145,14 +150,14 @@ public final class ProfileService {
         List<RankedProfile> batch = new ArrayList<>(pendingWrites);
         pendingWrites.clear();
         database.executeAsync(conn -> {
-            try (PreparedStatement ps = conn.prepareStatement("""
+            try (PreparedStatement ps = conn.prepareStatement(database.sql("""
                 INSERT OR REPLACE INTO ranked_profiles
                 (uuid, gamemode, rating, rating_deviation, volatility, tier, peak_rating, peak_tier,
                  peak_date, season_peak_rating, season_peak_tier, ranked, placement_played, placement_wins,
                  placement_losses, wins, losses, win_streak, best_win_opponent, best_win_tier, last_played,
                  decay_active, rank_protection, season_id, hidden_mmr)
                 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-                """)) {
+                """))) {
                 for (RankedProfile p : batch) {
                     bindProfile(ps, p);
                     ps.addBatch();
@@ -262,11 +267,11 @@ public final class ProfileService {
     public void savePlayerAsync(RankedPlayer player) {
         playerCache.put(player.uuid(), player);
         database.executeAsync(conn -> {
-            try (PreparedStatement ps = conn.prepareStatement("""
+            try (PreparedStatement ps = conn.prepareStatement(database.sql("""
                 INSERT OR REPLACE INTO ranked_players
                 (uuid, username, region, region_hidden, suspicion_score, created_at, last_seen)
                 VALUES (?,?,?,?,?,?,?)
-                """)) {
+                """))) {
                 ps.setString(1, player.uuid().toString());
                 ps.setString(2, player.username());
                 ps.setString(3, player.region());

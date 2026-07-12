@@ -8,7 +8,6 @@ softdepend: [PlaceholderAPI, FastAsyncWorldEdit, WorldEdit]
 commands:
   ranked:
     description: Main ranked command
-    aliases: [r]
   queue:
     description: Queue for ranked
   arena:
@@ -63,13 +62,9 @@ commands:
   spectatedeny:
     description: Deny spectate request
   spectatetoggle:
-    description: Toggle spectate requests (use /settings)
+    description: Toggle spectate requests
   settings:
     description: Player settings
-  spectateaccept:
-    description: Accept spectate request
-  spectatedeny:
-    description: Deny spectate request
   punish:
     description: Open punishment GUI
     permission: meranked.punish

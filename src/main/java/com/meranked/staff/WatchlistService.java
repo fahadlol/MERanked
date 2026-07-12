@@ -30,9 +30,9 @@ public final class WatchlistService {
         WatchEntry entry = new WatchEntry(target.getUniqueId(), target.getName(), reason, staff.getName(), System.currentTimeMillis());
         cache.add(entry);
         database.executeAsync(conn -> {
-            try (PreparedStatement ps = conn.prepareStatement("""
+            try (PreparedStatement ps = conn.prepareStatement(database.sql("""
                 INSERT OR REPLACE INTO ranked_staff_watchlist (uuid, reason, added_by, added_at) VALUES (?,?,?,?)
-                """)) {
+                """))) {
                 ps.setString(1, target.getUniqueId().toString());
                 ps.setString(2, reason);
                 ps.setString(3, staff.getName());
@@ -47,9 +47,9 @@ public final class WatchlistService {
         cache.removeIf(e -> e.uuid().equals(uuid));
         cache.add(entry);
         database.executeAsync(conn -> {
-            try (PreparedStatement ps = conn.prepareStatement("""
+            try (PreparedStatement ps = conn.prepareStatement(database.sql("""
                 INSERT OR REPLACE INTO ranked_staff_watchlist (uuid, reason, added_by, added_at) VALUES (?,?,?,?)
-                """)) {
+                """))) {
                 ps.setString(1, uuid.toString());
                 ps.setString(2, reason);
                 ps.setString(3, addedBy);

@@ -1,7 +1,7 @@
-enabled: true
+enabled: false
 port: 8080
 host: "0.0.0.0"
-api-key: "change-me"
+api-key: "change-me-before-enabling"
 rate-limit:
   enabled: true
   requests-per-minute: 120

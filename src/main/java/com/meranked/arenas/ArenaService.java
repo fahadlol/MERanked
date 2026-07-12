@@ -164,10 +164,10 @@ public final class ArenaService {
 
     public void saveArenaAsync(Arena arena) {
         database.executeAsync(conn -> {
-            try (PreparedStatement ps = conn.prepareStatement("""
+            try (PreparedStatement ps = conn.prepareStatement(database.sql("""
                 INSERT OR REPLACE INTO ranked_arenas (name, data, enabled, broken, usage_count)
                 VALUES (?, ?, ?, ?, ?)
-                """)) {
+                """))) {
                 ps.setString(1, arena.name());
                 ps.setString(2, serializeArena(arena));
                 ps.setBoolean(3, arena.enabled());
