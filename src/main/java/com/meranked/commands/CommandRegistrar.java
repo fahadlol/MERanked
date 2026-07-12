@@ -52,6 +52,7 @@ public final class CommandRegistrar {
         register("replay", new ReplayCommand(services));
         register("spectateaccept", new SpectateAcceptCommand(services));
         register("spectatedeny", new SpectateDenyCommand(services));
+        register("spectatetoggle", new SpectateToggleCommand(services));
         register("punish", new PunishCommand(services));
         register("history", new HistoryCommand(services));
         register("unpunish", new UnpunishCommand(services));

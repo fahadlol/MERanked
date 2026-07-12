@@ -1,3 +1,4 @@
+# Default kit layouts per gamemode. Populate inventory/armor before production use.
 defaults:
   mace_default:
     gamemode: Mace

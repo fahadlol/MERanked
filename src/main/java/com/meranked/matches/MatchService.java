@@ -524,11 +524,15 @@ public final class MatchService {
     private void sendCoachingInsights(Player player, RankedMatch match, UUID uuid) {
         if (player == null || !services.coachingInsights().enabled()) return;
         FileConfiguration cfg = services.config().get("coaching-insights.yml");
-        if (!cfg.getBoolean("coaching-insights.show-in-chat", true)) return;
-        int ping = player.getPing();
-        for (String line : services.coachingInsights().insights(match, uuid, ping)) {
-            if (line == null || line.isBlank()) continue;
-            player.sendMessage(services.messages().format(line));
+        java.util.List<String> insights = services.coachingInsights().insights(match, uuid, player.getPing()).stream()
+                .filter(line -> line != null && !line.isBlank())
+                .toList();
+        if (insights.isEmpty()) return;
+        if (cfg.getBoolean("coaching-insights.show-in-chat", true)) {
+            for (String line : insights) player.sendMessage(services.messages().format(line));
+        }
+        if (cfg.getBoolean("coaching-insights.show-in-actionbar", false)) {
+            player.sendActionBar(services.messages().format(insights.get(0)));
         }
     }
 
@@ -601,11 +605,11 @@ public final class MatchService {
     private void saveParticipantsAsync(RankedMatch match) {
         services.database().executeAsync(conn -> {
             for (UUID uuid : List.of(match.player1(), match.player2())) {
-                try (PreparedStatement ps = conn.prepareStatement("""
+                try (PreparedStatement ps = conn.prepareStatement(services.database().sql("""
                     INSERT OR REPLACE INTO ranked_match_participants
                     (match_id, uuid, rating_before, rating_after, tier_before, tier_after, rating_change, ping)
                     VALUES (?,?,?,?,?,?,?,?)
-                    """)) {
+                    """))) {
                     double before = match.ratingBefore().getOrDefault(uuid, 0.0);
                     double after = match.ratingAfter().getOrDefault(uuid, before);
                     Player p = Bukkit.getPlayer(uuid);
@@ -666,18 +670,24 @@ public final class MatchService {
 
     private void saveMatchAsync(RankedMatch match) {
         DatabaseService db = services.database();
+        int suspicionThreshold = services.config().get("suspicion.yml").getInt("staff-list-threshold", 30);
+        boolean suspicious = false;
+        if (match.winner() != null) suspicious = services.suspicion().getScore(match.winner()) >= suspicionThreshold;
+        if (!suspicious && match.loser() != null) suspicious = services.suspicion().getScore(match.loser()) >= suspicionThreshold;
+
+        boolean finalSuspicious = suspicious;
         db.executeAsync(conn -> {
-            try (PreparedStatement ps = conn.prepareStatement("""
+            try (PreparedStatement ps = conn.prepareStatement(db.sql("""
                 INSERT OR REPLACE INTO ranked_matches
                 (match_id, gamemode, arena, winner, loser, duration, started_at, ended_at,
-                 no_rating, no_rating_reason, dodge, season_id)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
-                """)) {
+                 no_rating, no_rating_reason, dodge, season_id, suspicious)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
+                """))) {
                 ps.setString(1, match.matchId());
                 ps.setString(2, match.gamemode());
                 ps.setString(3, match.arenaName());
-                ps.setString(4, match.winner().toString());
-                ps.setString(5, match.loser().toString());
+                ps.setString(4, match.winner() == null ? null : match.winner().toString());
+                ps.setString(5, match.loser() == null ? null : match.loser().toString());
                 ps.setLong(6, match.durationMillis());
                 ps.setLong(7, match.startedAt());
                 ps.setLong(8, System.currentTimeMillis());
@@ -685,6 +695,7 @@ public final class MatchService {
                 ps.setString(10, match.noRatingReason());
                 ps.setBoolean(11, match.dodge());
                 ps.setInt(12, services.seasons().currentSeasonId());
+                ps.setBoolean(13, finalSuspicious);
                 ps.executeUpdate();
             }
         });

@@ -195,7 +195,7 @@ public final class ServiceRegistry {
         altLockService = new AltLockService(plugin, this);
         staffNotesService = new StaffNotesService(plugin, databaseService);
         punishmentService = new PunishmentService(plugin, this);
-        punishmentService.loadAll();
+        punishmentService.loadAll().join();
         evidenceService = new EvidenceService(plugin, this);
         restartProtectionService = new RestartProtectionService(plugin, this);
         queueService.setLockHolder(restartProtectionService);

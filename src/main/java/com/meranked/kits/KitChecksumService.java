@@ -68,10 +68,10 @@ public final class KitChecksumService {
                     if (rs.next()) version = rs.getInt("version") + 1;
                 }
             }
-            try (PreparedStatement ps = conn.prepareStatement("""
+            try (PreparedStatement ps = conn.prepareStatement(services.database().sql("""
                 INSERT OR REPLACE INTO ranked_kit_checksums (uuid, gamemode, checksum, version, updated_at)
                 VALUES (?,?,?,?,?)
-                """)) {
+                """))) {
                 ps.setString(1, uuid.toString());
                 ps.setString(2, gamemode);
                 ps.setString(3, checksum);

@@ -115,6 +115,7 @@ public final class RankedProfile {
     public void setSeasonId(int seasonId) { this.seasonId = seasonId; }
     public double placementOpponentRatingSum() { return placementOpponentRatingSum; }
     public void addPlacementOpponentRating(double rating) { this.placementOpponentRatingSum += rating; }
+    public void setPlacementOpponentRatingSum(double sum) { this.placementOpponentRatingSum = sum; }
     public double averagePlacementOpponentRating() {
         return placementPlayed == 0 ? 1500 : placementOpponentRatingSum / placementPlayed;
     }
@@ -133,6 +134,7 @@ public final class RankedProfile {
     public void setHiddenMmr(double hiddenMmr) { this.hiddenMmr = hiddenMmr; }
     public double placementBehaviorBias() { return placementBehaviorBias; }
     public void addPlacementBehaviorBias(double delta) { this.placementBehaviorBias += delta; }
+    public void setPlacementBehaviorBias(double bias) { this.placementBehaviorBias = bias; }
 
     /** Human-readable streak label, e.g. "5 Win Streak" or "2 Loss Streak". */
     public String streakLabel() {

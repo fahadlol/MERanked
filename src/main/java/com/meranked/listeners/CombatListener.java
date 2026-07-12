@@ -42,7 +42,7 @@ public final class CombatListener implements Listener {
     public void onTotem(EntityResurrectEvent event) {
         if (!(event.getEntity() instanceof Player player)) return;
         services.matches().getMatch(player.getUniqueId()).ifPresent(match -> {
-            match.stats(match.opponent(player.getUniqueId())).incrementTotems();
+            match.stats(player.getUniqueId()).incrementTotems();
             services.replays().recordCombatEvent(match, "TOTEM_POP",
                     com.meranked.util.TextUtil.formatMatchTime(match.durationMillis()) + " - totem popped");
         });

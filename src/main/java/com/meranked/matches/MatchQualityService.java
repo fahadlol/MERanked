@@ -144,11 +144,11 @@ public final class MatchQualityService {
         FileConfiguration cfg = configService.get("match-quality.yml");
         if (!cfg.getBoolean("match-quality.store-in-history", true)) return;
         database.executeAsync(conn -> {
-            try (PreparedStatement ps = conn.prepareStatement("""
+            try (PreparedStatement ps = conn.prepareStatement(database.sql("""
                 INSERT OR REPLACE INTO ranked_match_quality
                 (match_id, quality, reason, rating_diff, confidence_diff, ping_diff, queue_range, matchmaking_reason)
                 VALUES (?,?,?,?,?,?,?,?)
-                """)) {
+                """))) {
                 ps.setString(1, matchId);
                 ps.setInt(2, result.quality());
                 ps.setString(3, result.reason());

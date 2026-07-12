@@ -11,6 +11,7 @@ import java.sql.ResultSet;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -33,9 +34,9 @@ public final class PunishmentService {
         this.services = services;
     }
 
-    public void loadAll() {
+    public CompletableFuture<Void> loadAll() {
         cache.clear();
-        services.database().executeAsync(conn -> {
+        return services.database().executeAsync(conn -> {
             try (PreparedStatement ps = conn.prepareStatement(
                     "SELECT * FROM ranked_punishments WHERE active = TRUE");
                  ResultSet rs = ps.executeQuery()) {
@@ -116,6 +117,16 @@ public final class PunishmentService {
         }
     }
 
+    public int liftQueueBans(UUID target, UUID staff) {
+        List<Punishment> active = cache.getOrDefault(target, List.of()).stream()
+                .filter(p -> p.type() == Type.QUEUEBAN && p.isActive())
+                .toList();
+        for (Punishment p : active) {
+            unpunish(p.punishmentId(), staff);
+        }
+        return active.size();
+    }
+
     public void unpunish(String punishmentId, UUID staff) {
         services.database().executeAsync(conn -> {
             UUID target = null;
@@ -181,6 +192,20 @@ public final class PunishmentService {
             }
             return list;
         }).join();
+    }
+
+    /** Active ranked/queue bans for staff listings. */
+    public List<Punishment> activeRankedRestrictions() {
+        List<Punishment> all = new ArrayList<>();
+        for (List<Punishment> list : cache.values()) {
+            for (Punishment p : list) {
+                if (p.isActive() && (p.type() == Type.RANKEDBAN || p.type() == Type.QUEUEBAN)) {
+                    all.add(p);
+                }
+            }
+        }
+        all.sort((a, b) -> Long.compare(b.startTime(), a.startTime()));
+        return all;
     }
 
     private void logHistory(java.sql.Connection conn, String pid, UUID uuid, String action, UUID staff) throws java.sql.SQLException {

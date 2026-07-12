@@ -50,14 +50,7 @@ public final class UpsetService {
 
     public void recordUpset(UUID uuid, String gamemode, double opponentRating, double diff) {
         database.executeAsync(conn -> {
-            try (PreparedStatement ps = conn.prepareStatement("""
-                INSERT INTO ranked_upsets (uuid, gamemode, upset_wins, best_upset_diff, highest_beaten)
-                VALUES (?,?,1,?,?)
-                ON CONFLICT(uuid, gamemode) DO UPDATE SET
-                    upset_wins = upset_wins + 1,
-                    best_upset_diff = MAX(best_upset_diff, ?),
-                    highest_beaten = MAX(highest_beaten, ?)
-                """)) {
+            try (PreparedStatement ps = conn.prepareStatement(database.dialect().upsetUpsert())) {
                 ps.setString(1, uuid.toString());
                 ps.setString(2, gamemode);
                 ps.setDouble(3, diff);
