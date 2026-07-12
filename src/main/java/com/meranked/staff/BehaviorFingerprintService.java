@@ -61,6 +61,10 @@ public final class BehaviorFingerprintService {
 
     private void evaluateSmurf(UUID uuid, String gamemode, double cps, double dmgPerSec, double totalDmg) {
         FileConfiguration cfg = services.config().get("behavior-fingerprint.yml");
+        int minMatches = cfg.getInt("behavior-fingerprint.min-matches", 3);
+        int priorSamples = fingerprintSamples(uuid, gamemode);
+        if (priorSamples < minMatches) return;
+
         double cpsThreshold = cfg.getDouble("behavior-fingerprint.smurf-cps-threshold", 14);
         var player = services.profiles().getPlayer(uuid);
         if (player == null) return;
@@ -71,7 +75,7 @@ public final class BehaviorFingerprintService {
         if (cps < cpsThreshold && dmgPerSec < 12) return;
 
         int increase = cfg.getInt("behavior-fingerprint.suspicion-increase", 12);
-        services.suspicion().addScore(uuid, increase, "High mechanical performance on new/suspicious account");
+        services.suspicion().addFactor(uuid, "alt-behavior", "High mechanical performance on new/suspicious account");
 
         AlertSeverity sev;
         try {
@@ -122,6 +126,20 @@ public final class BehaviorFingerprintService {
 
     public void clear(UUID uuid) {
         sessions.remove(uuid);
+    }
+
+    private int fingerprintSamples(UUID uuid, String gamemode) {
+        return services.database().queryAsync(conn -> {
+            try (PreparedStatement ps = conn.prepareStatement(
+                    "SELECT samples FROM ranked_behavior_fingerprints WHERE uuid = ? AND gamemode = ?")) {
+                ps.setString(1, uuid.toString());
+                ps.setString(2, gamemode);
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (rs.next()) return rs.getInt("samples");
+                }
+            }
+            return 0;
+        }).join();
     }
 
     private static final class Session {

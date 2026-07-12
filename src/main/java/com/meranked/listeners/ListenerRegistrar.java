@@ -20,6 +20,7 @@ public final class ListenerRegistrar {
         register(new QueueListener(services));
         register(new KitEditorListener(services));
         register(new CombatListener(services));
+        register(new ReplayMatchListener(services));
         register(new CommandBlockListener(services));
         register(new ChatListener(services));
     }

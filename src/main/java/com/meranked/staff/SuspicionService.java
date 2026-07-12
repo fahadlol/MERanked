@@ -49,6 +49,15 @@ public final class SuspicionService {
         }
     }
 
+    /** Adds score from suspicion.yml factors.<key> when enabled. */
+    public void addFactor(UUID uuid, String factorKey, String reason) {
+        FileConfiguration config = configService.get("suspicion.yml");
+        if (!config.getBoolean("enabled", true)) return;
+        int amount = config.getInt("factors." + factorKey, 0);
+        if (amount <= 0) return;
+        addScore(uuid, amount, reason != null ? reason : factorKey);
+    }
+
     public void lowerScore(UUID uuid, int amount) {
         int newScore = Math.max(0, getScore(uuid) - amount);
         cache.put(uuid, newScore);

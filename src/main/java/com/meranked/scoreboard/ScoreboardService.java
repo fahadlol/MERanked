@@ -67,6 +67,8 @@ public final class ScoreboardService {
         ph.put("season", String.valueOf(services.seasons().currentSeasonId()));
         ph.put("mace_tier", services.placements().displayTier(first));
         ph.put("crystal_tier", services.placements().displayTier(second));
+        ph.put("mode1_tier", services.placements().displayTier(first));
+        ph.put("mode2_tier", services.placements().displayTier(second));
         ph.put("mode1", mode1);
         ph.put("mode2", mode2);
         boolean needsProgress = lines.stream().anyMatch(l -> l.contains("%mace_progress%") || l.contains("%crystal_progress%"));

@@ -263,10 +263,16 @@ public final class MatchService {
 
     public void handleDisconnect(Player player) {
         getMatch(player.getUniqueId()).ifPresent(match -> {
-            // Once the match has gone live (including between Best-of-3 rounds), a disconnect is a full loss.
-            // Before it starts, it is treated as a dodge and the match is cancelled.
+            FileConfiguration boostCfg = services.config().get("anti-boost.yml");
+            boolean countsAsLoss = boostCfg.getBoolean("disconnect.counts-as-loss", true);
             if (match.hasStarted()) {
-                endMatch(match, match.opponent(player.getUniqueId()), player.getUniqueId(), true);
+                if (countsAsLoss) {
+                    endMatch(match, match.opponent(player.getUniqueId()), player.getUniqueId(), true);
+                } else {
+                    match.setNoRatingChange(true);
+                    match.setNoRatingReason("DISCONNECT");
+                    cancelMatch(match, "Disconnect (no rating)");
+                }
             } else {
                 services.antiDodge().recordDodge(player.getUniqueId());
                 cancelMatch(match, "Disconnect before start");
@@ -299,12 +305,31 @@ public final class MatchService {
 
         AntiBoostService.ValidationResult validation = services.antiBoost().validate(
                 match.player1(), match.player2(), ip1, ip2, match.durationMillis());
+        FileConfiguration boostCfg = services.config().get("anti-boost.yml");
 
         if (!validation.allowed()) {
             match.setNoRatingChange(true);
             match.setNoRatingReason(validation.reason());
             services.alerts().createAlert("SAME_IP_MATCH".equals(validation.reason()) ? "SAME_IP_MATCH" : "SHORT_MATCH",
                     AlertSeverity.MEDIUM, validation.reason(), match, List.of(winner, loser));
+            if ("SAME_IP".equals(validation.reason()) && boostCfg.getBoolean("suspicious.flag-same-ip", true)) {
+                services.suspicion().addFactor(winner, "same-ip-match", "Same IP rated match blocked");
+                services.suspicion().addFactor(loser, "same-ip-match", "Same IP rated match blocked");
+            }
+            if ("OPPONENT_LIMIT".equals(validation.reason()) && boostCfg.getBoolean("suspicious.flag-repeated-opponents", true)) {
+                services.suspicion().addFactor(winner, "repeated-opponent", "Daily opponent limit reached");
+                services.suspicion().addFactor(loser, "repeated-opponent", "Daily opponent limit reached");
+            }
+            if ("SHORT_MATCH".equals(validation.reason()) && boostCfg.getBoolean("suspicious.flag-short-wins", true)) {
+                services.suspicion().addFactor(winner, "short-win", "Short match win");
+            }
+        }
+
+        if (disconnect) {
+            services.suspicion().addFactor(loser, "disconnect-pattern", "Disconnect during match");
+            services.replays().recordCombatEvent(match, "DISCONNECT",
+                    com.meranked.util.TextUtil.formatMatchTime(match.durationMillis()) + " - "
+                            + Bukkit.getOfflinePlayer(loser).getName() + " disconnected");
         }
 
         computeMatchQuality(match);
@@ -437,6 +462,12 @@ public final class MatchService {
         }
 
         services.suspicion().checkRatingSpike(winner, winUpdate.change());
+
+        FileConfiguration suspicionCfg = services.config().get("suspicion.yml");
+        int streakThreshold = suspicionCfg.getInt("unusual-win-streak-threshold", 8);
+        if (!winProfile.inPlacements(required) && winProfile.winStreak() >= streakThreshold) {
+            services.suspicion().addFactor(winner, "unusual-win-streak", "Win streak " + winProfile.winStreak());
+        }
     }
 
     private void announceHotStreak(UUID uuid, RankedProfile profile) {
@@ -676,6 +707,10 @@ public final class MatchService {
         if (!suspicious && match.loser() != null) suspicious = services.suspicion().getScore(match.loser()) >= suspicionThreshold;
 
         boolean finalSuspicious = suspicious;
+        if (suspicious) {
+            if (match.winner() != null) services.suspicion().addFactor(match.winner(), "flagged-match", "Suspicious match");
+            if (match.loser() != null) services.suspicion().addFactor(match.loser(), "flagged-match", "Suspicious match");
+        }
         db.executeAsync(conn -> {
             try (PreparedStatement ps = conn.prepareStatement(db.sql("""
                 INSERT OR REPLACE INTO ranked_matches

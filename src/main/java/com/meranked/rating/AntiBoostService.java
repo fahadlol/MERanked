@@ -1,4 +1,4 @@
-    package com.meranked.rating;
+package com.meranked.rating;
 
 import com.meranked.config.ConfigService;
 import com.meranked.database.DatabaseService;
@@ -7,13 +7,11 @@ import org.bukkit.configuration.file.FileConfiguration;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 
 public final class AntiBoostService {
 
     private final ConfigService configService;
     private final DatabaseService database;
-    private final ConcurrentHashMap<String, Integer> sameIpCache = new ConcurrentHashMap<>();
 
     public AntiBoostService(ConfigService configService, DatabaseService database) {
         this.configService = configService;

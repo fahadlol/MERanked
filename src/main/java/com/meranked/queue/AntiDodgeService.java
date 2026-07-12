@@ -62,6 +62,7 @@ public final class AntiDodgeService {
         DodgeRecord updated = new DodgeRecord(newCount, cooldown, hiddenUntil, record.hiddenReason(), System.currentTimeMillis());
         cache.put(uuid, updated);
         saveAsync(uuid, updated);
+        plugin.services().suspicion().addFactor(uuid, "dodge", "Queue dodge");
 
         Player player = Bukkit.getPlayer(uuid);
         if (player != null) {

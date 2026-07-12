@@ -1,6 +1,7 @@
 enabled: true
 max-score: 100
 staff-list-threshold: 30
+unusual-win-streak-threshold: 8
 decay-per-day: 2
 decay-enabled: true
 

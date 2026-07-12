@@ -1,38 +1,116 @@
-# Default kit layouts per gamemode. Populate inventory/armor before production use.
+# Default kit layouts per gamemode. Supports material strings or {material, amount} maps.
 defaults:
   mace_default:
     gamemode: Mace
-    armor: []
-    inventory: []
+    armor:
+      - material: DIAMOND_HELMET
+      - material: DIAMOND_CHESTPLATE
+      - material: DIAMOND_LEGGINGS
+      - material: DIAMOND_BOOTS
+    inventory:
+      - material: MACE
+        amount: 1
+      - material: WIND_CHARGE
+        amount: 16
+      - material: GOLDEN_APPLE
+        amount: 8
+      - material: SHIELD
+        amount: 1
   crystal_default:
     gamemode: Crystal
-    armor: []
-    inventory: []
+    armor:
+      - material: NETHERITE_HELMET
+      - material: NETHERITE_CHESTPLATE
+      - material: NETHERITE_LEGGINGS
+      - material: NETHERITE_BOOTS
+    inventory:
+      - material: DIAMOND_SWORD
+        amount: 1
+      - material: END_CRYSTAL
+        amount: 64
+      - material: OBSIDIAN
+        amount: 64
+      - material: GOLDEN_APPLE
+        amount: 16
+      - material: TOTEM_OF_UNDYING
+        amount: 1
   sword_default:
     gamemode: Sword
-    armor: []
-    inventory: []
+    armor:
+      - material: DIAMOND_HELMET
+      - material: DIAMOND_CHESTPLATE
+      - material: DIAMOND_LEGGINGS
+      - material: DIAMOND_BOOTS
+    inventory:
+      - material: DIAMOND_SWORD
+        amount: 1
+      - material: GOLDEN_APPLE
+        amount: 8
   axe_default:
     gamemode: Axe
-    armor: []
-    inventory: []
+    armor:
+      - material: DIAMOND_HELMET
+      - material: DIAMOND_CHESTPLATE
+      - material: DIAMOND_LEGGINGS
+      - material: DIAMOND_BOOTS
+    inventory:
+      - material: DIAMOND_AXE
+        amount: 1
+      - material: GOLDEN_APPLE
+        amount: 8
   smp_default:
     gamemode: SMP
-    armor: []
-    inventory: []
+    armor:
+      - material: IRON_HELMET
+      - material: IRON_CHESTPLATE
+      - material: IRON_LEGGINGS
+      - material: IRON_BOOTS
+    inventory:
+      - material: IRON_SWORD
+        amount: 1
+      - material: BOW
+        amount: 1
+      - material: ARROW
+        amount: 32
   uhc_default:
     gamemode: UHC
-    armor: []
-    inventory: []
+    armor:
+      - material: DIAMOND_HELMET
+      - material: DIAMOND_CHESTPLATE
+      - material: DIAMOND_LEGGINGS
+      - material: DIAMOND_BOOTS
+    inventory:
+      - material: DIAMOND_SWORD
+        amount: 1
+      - material: GOLDEN_APPLE
+        amount: 3
   spear_mace_default:
     gamemode: "Spear Mace"
-    armor: []
-    inventory: []
+    armor:
+      - material: DIAMOND_HELMET
+      - material: DIAMOND_CHESTPLATE
+      - material: DIAMOND_LEGGINGS
+      - material: DIAMOND_BOOTS
+    inventory:
+      - material: MACE
+        amount: 1
+      - material: TRIDENT
+        amount: 1
+      - material: GOLDEN_APPLE
+        amount: 8
   diamond_pot_default:
     gamemode: "Diamond Pot"
     armor: []
-    inventory: []
+    inventory:
+      - material: DIAMOND_SWORD
+        amount: 1
+      - material: SPLASH_POTION
+        amount: 1
   netherite_pot_default:
     gamemode: "Netherite Pot"
     armor: []
-    inventory: []
+    inventory:
+      - material: NETHERITE_SWORD
+        amount: 1
+      - material: SPLASH_POTION
+        amount: 1
