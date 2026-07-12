@@ -96,11 +96,11 @@ public final class AlertService {
     private void saveAlertAsync(StaffAlert alert) {
         database.executeAsync(conn -> {
             try {
-                try (PreparedStatement ps = conn.prepareStatement("""
+                try (PreparedStatement ps = conn.prepareStatement(database.sql("""
                     INSERT OR REPLACE INTO ranked_alerts
                     (alert_id, alert_type, severity, reason, match_id, gamemode, arena, players, created_at, resolved, flagged_by)
                     VALUES (?,?,?,?,?,?,?,?,?,?,?)
-                    """)) {
+                    """))) {
                     ps.setString(1, alert.alertId());
                     ps.setString(2, alert.type());
                     ps.setString(3, alert.severity().name());

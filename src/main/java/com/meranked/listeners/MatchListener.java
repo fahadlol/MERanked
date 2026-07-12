@@ -56,5 +56,10 @@ public final class MatchListener implements Listener {
                 event.setTo(event.getFrom());
             }
         }
+        if (m.state() == RankedMatch.State.ACTIVE) {
+            if (event.getFrom().getX() != event.getTo().getX() || event.getFrom().getZ() != event.getTo().getZ()) {
+                services.behaviorFingerprint().recordMove(event.getPlayer().getUniqueId());
+            }
+        }
     }
 }

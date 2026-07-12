@@ -11,7 +11,6 @@ import java.sql.ResultSet;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Tracks per-match behavioral signals (CPS, damage rate) and flags smurf-like performance on new accounts.
@@ -64,6 +63,7 @@ public final class BehaviorFingerprintService {
         FileConfiguration cfg = services.config().get("behavior-fingerprint.yml");
         double cpsThreshold = cfg.getDouble("behavior-fingerprint.smurf-cps-threshold", 14);
         var player = services.profiles().getPlayer(uuid);
+        if (player == null) return;
         long accountAgeDays = (System.currentTimeMillis() - player.createdAt()) / 86400000L;
         boolean suspicious = accountAgeDays <= 7 || player.suspicionScore() >= 30;
 
@@ -105,10 +105,10 @@ public final class BehaviorFingerprintService {
                     }
                 }
             }
-            try (PreparedStatement ps = conn.prepareStatement("""
+            try (PreparedStatement ps = conn.prepareStatement(services.database().sql("""
                 INSERT OR REPLACE INTO ranked_behavior_fingerprints (uuid, gamemode, avg_cps, avg_dps, samples, updated_at)
                 VALUES (?,?,?,?,?,?)
-                """)) {
+                """))) {
                 ps.setString(1, uuid.toString());
                 ps.setString(2, gamemode);
                 ps.setDouble(3, avgCps);

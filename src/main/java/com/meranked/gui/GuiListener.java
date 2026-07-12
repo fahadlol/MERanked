@@ -33,6 +33,8 @@ public final class GuiListener implements Listener {
 
         switch (session.type()) {
             case RANKED_MENU -> handleRankedMenu(player, event.getRawSlot());
+            case PROFILE -> handleProfile(player, session, event.getRawSlot());
+            case LEADERBOARD -> handleLeaderboard(player, session, event.getRawSlot());
             case SETTINGS -> handleSettings(player, event.getRawSlot());
             case STAFF_ALERTS -> handleStaffAlerts(player, event.getRawSlot());
             case STAFF_ALERT_DETAIL -> handleAlertDetail(player, session, event.getRawSlot());
@@ -48,7 +50,8 @@ public final class GuiListener implements Listener {
             case PUNISH_REASON -> handlePunishReason(player, session, event.getRawSlot());
             case PUNISH_DURATION -> handlePunishDuration(player, session, event.getRawSlot());
             case PUNISH_CONFIRM -> handlePunishConfirm(player, session, event.getRawSlot());
-            case IDENTITY_CARD -> {}
+            case IDENTITY_CARD -> { if (event.getRawSlot() == 40) player.closeInventory(); }
+            case WATCHLIST -> handleWatchlist(player, event.getRawSlot());
             case FAIRNESS_DASHBOARD -> { if (event.getRawSlot() >= 40) player.closeInventory(); }
             default -> {}
         }
@@ -75,6 +78,44 @@ public final class GuiListener implements Listener {
             var modes = services.profiles().enabledGamemodes();
             if (index < modes.size()) services.queue().joinQueue(player, modes.get(index));
         }
+    }
+
+    private void handleProfile(Player player, GuiSession session, int slot) {
+        if (slot == 49) {
+            services.gui().openRankedMenu(player);
+            return;
+        }
+        if (slot >= 45 && slot <= 53) {
+            int index = slot - 45;
+            var modes = services.profiles().enabledGamemodes();
+            if (index < modes.size()) services.gui().openProfile(player, modes.get(index));
+        }
+    }
+
+    private void handleLeaderboard(Player player, GuiSession session, int slot) {
+        if (slot == 49) {
+            services.gui().openRankedMenu(player);
+            return;
+        }
+        if (slot >= 45 && slot <= 53) {
+            int index = slot - 45;
+            var modes = services.profiles().enabledGamemodes();
+            if (index < modes.size()) services.gui().openLeaderboard(player, modes.get(index));
+        }
+    }
+
+    private void handleWatchlist(Player staff, int slot) {
+        if (slot == 49) {
+            staff.closeInventory();
+            return;
+        }
+        if (slot < 0 || slot >= 45) return;
+        var entries = services.watchlist().all();
+        if (slot >= entries.size()) return;
+        var entry = entries.get(slot);
+        services.watchlist().remove(entry.uuid());
+        staff.sendMessage("§aRemoved " + entry.name() + " from watchlist.");
+        services.gui().openWatchlist(staff);
     }
 
     private void handleSettings(Player player, int slot) {
@@ -293,9 +334,8 @@ public final class GuiListener implements Listener {
             String label = String.valueOf(d.get("label"));
             long seconds = ((Number) d.get("seconds")).longValue();
             if (seconds < 0) {
-                // Custom: default to permanent for simplicity (chat prompt could be added).
-                seconds = 0;
-                label = "Permanent";
+                services.gui().requestCustomPunishDuration(staff, target, name, type, reason);
+                return;
             }
             services.gui().openPunishConfirm(staff, target, name, type, reason, seconds, label);
         }

@@ -39,10 +39,10 @@ public final class BanService {
         BanEntry entry = new BanEntry(uuid, reason, bannedBy, System.currentTimeMillis(), expiresAt);
         cache.put(uuid, entry);
         database.executeAsync(conn -> {
-            try (PreparedStatement ps = conn.prepareStatement("""
+            try (PreparedStatement ps = conn.prepareStatement(database.sql("""
                 INSERT OR REPLACE INTO ranked_bans (uuid, reason, banned_by, banned_at, expires_at)
                 VALUES (?,?,?,?,?)
-                """)) {
+                """))) {
                 ps.setString(1, uuid.toString());
                 ps.setString(2, reason);
                 ps.setString(3, bannedBy);

@@ -62,6 +62,7 @@ public final class RegionService {
     }
 
     public String displayRegion(Player player) {
+        profileService.ensurePlayer(player);
         RankedPlayer rp = profileService.getPlayer(player.getUniqueId());
         return rp.regionHidden() ? "Hidden" : rp.region();
     }

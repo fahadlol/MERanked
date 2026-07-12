@@ -47,7 +47,7 @@ public final class SeasonService {
         configService.save("seasons.yml", config);
         database.executeAsync(conn -> {
             try (var ps = conn.prepareStatement(
-                    "INSERT OR REPLACE INTO ranked_seasons (season_id, name, start_date, active) VALUES (?, ?, ?, ?)")) {
+                    database.sql("INSERT OR REPLACE INTO ranked_seasons (season_id, name, start_date, active) VALUES (?, ?, ?, ?)"))) {
                 ps.setInt(1, currentSeasonId);
                 ps.setString(2, name);
                 ps.setLong(3, System.currentTimeMillis());

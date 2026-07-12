@@ -22,6 +22,7 @@ public final class DatabaseService {
     private HikariDataSource dataSource;
     private ExecutorService executor;
     private String databaseType;
+    private SqlDialect dialect;
 
     public DatabaseService(MERankedPlugin plugin, ConfigService configService) {
         this.plugin = plugin;
@@ -50,6 +51,7 @@ public final class DatabaseService {
             }
 
             dataSource = new HikariDataSource(config);
+            dialect = new SqlDialect(databaseType);
             executor = Executors.newFixedThreadPool(Math.max(2, Runtime.getRuntime().availableProcessors() / 2));
             createTables();
             plugin.getLogger().info("Database initialized (" + databaseType + ").");
@@ -59,7 +61,7 @@ public final class DatabaseService {
     private void createTables() {
         executeSync(conn -> {
             try (Statement stmt = conn.createStatement()) {
-                stmt.execute("""
+                stmt.execute(ddl("""
                     CREATE TABLE IF NOT EXISTS ranked_players (
                         uuid VARCHAR(36) PRIMARY KEY,
                         username VARCHAR(16) NOT NULL,
@@ -69,8 +71,8 @@ public final class DatabaseService {
                         created_at BIGINT,
                         last_seen BIGINT
                     )
-                    """);
-                stmt.execute("""
+                    """));
+                stmt.execute(ddl("""
                     CREATE TABLE IF NOT EXISTS ranked_profiles (
                         uuid VARCHAR(36),
                         gamemode VARCHAR(32),
@@ -99,8 +101,8 @@ public final class DatabaseService {
                         hidden_mmr DOUBLE DEFAULT 1500,
                         PRIMARY KEY (uuid, gamemode)
                     )
-                    """);
-                stmt.execute("""
+                    """));
+                stmt.execute(ddl("""
                     CREATE TABLE IF NOT EXISTS ranked_matches (
                         match_id VARCHAR(16) PRIMARY KEY,
                         gamemode VARCHAR(32),
@@ -116,8 +118,8 @@ public final class DatabaseService {
                         season_id INT DEFAULT 1,
                         suspicious BOOLEAN DEFAULT FALSE
                     )
-                    """);
-                stmt.execute("""
+                    """));
+                stmt.execute(ddl("""
                     CREATE TABLE IF NOT EXISTS ranked_match_participants (
                         match_id VARCHAR(16),
                         uuid VARCHAR(36),
@@ -129,8 +131,8 @@ public final class DatabaseService {
                         ping INT DEFAULT 0,
                         PRIMARY KEY (match_id, uuid)
                     )
-                    """);
-                stmt.execute("""
+                    """));
+                stmt.execute(ddl("""
                     CREATE TABLE IF NOT EXISTS ranked_match_events (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
                         match_id VARCHAR(16),
@@ -141,8 +143,8 @@ public final class DatabaseService {
                         timestamp_ms BIGINT,
                         description TEXT
                     )
-                    """);
-                stmt.execute("""
+                    """));
+                stmt.execute(ddl("""
                     CREATE TABLE IF NOT EXISTS ranked_seasons (
                         season_id INT PRIMARY KEY,
                         name VARCHAR(64),
@@ -150,8 +152,8 @@ public final class DatabaseService {
                         end_date BIGINT,
                         active BOOLEAN DEFAULT TRUE
                     )
-                    """);
-                stmt.execute("""
+                    """));
+                stmt.execute(ddl("""
                     CREATE TABLE IF NOT EXISTS ranked_bans (
                         uuid VARCHAR(36) PRIMARY KEY,
                         reason TEXT,
@@ -159,8 +161,8 @@ public final class DatabaseService {
                         banned_at BIGINT,
                         expires_at BIGINT
                     )
-                    """);
-                stmt.execute("""
+                    """));
+                stmt.execute(ddl("""
                     CREATE TABLE IF NOT EXISTS ranked_opponent_limits (
                         uuid VARCHAR(36),
                         opponent_uuid VARCHAR(36),
@@ -168,8 +170,8 @@ public final class DatabaseService {
                         last_match BIGINT,
                         PRIMARY KEY (uuid, opponent_uuid)
                     )
-                    """);
-                stmt.execute("""
+                    """));
+                stmt.execute(ddl("""
                     CREATE TABLE IF NOT EXISTS ranked_alerts (
                         alert_id VARCHAR(16) PRIMARY KEY,
                         alert_type VARCHAR(32),
@@ -183,8 +185,8 @@ public final class DatabaseService {
                         resolved BOOLEAN DEFAULT FALSE,
                         flagged_by VARCHAR(36)
                     )
-                    """);
-                stmt.execute("""
+                    """));
+                stmt.execute(ddl("""
                     CREATE TABLE IF NOT EXISTS ranked_player_flags (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
                         uuid VARCHAR(36),
@@ -194,16 +196,16 @@ public final class DatabaseService {
                         created_at BIGINT,
                         staff_uuid VARCHAR(36)
                     )
-                    """);
-                stmt.execute("""
+                    """));
+                stmt.execute(ddl("""
                     CREATE TABLE IF NOT EXISTS ranked_staff_watchlist (
                         uuid VARCHAR(36) PRIMARY KEY,
                         reason TEXT,
                         added_by VARCHAR(36),
                         added_at BIGINT
                     )
-                    """);
-                stmt.execute("""
+                    """));
+                stmt.execute(ddl("""
                     CREATE TABLE IF NOT EXISTS ranked_kits (
                         uuid VARCHAR(36),
                         gamemode VARCHAR(32),
@@ -212,23 +214,23 @@ public final class DatabaseService {
                         updated_at BIGINT,
                         PRIMARY KEY (uuid, gamemode)
                     )
-                    """);
-                stmt.execute("""
+                    """));
+                stmt.execute(ddl("""
                     CREATE TABLE IF NOT EXISTS ranked_replays (
                         match_id VARCHAR(16) PRIMARY KEY,
                         data TEXT,
                         created_at BIGINT
                     )
-                    """);
-                stmt.execute("""
+                    """));
+                stmt.execute(ddl("""
                     CREATE TABLE IF NOT EXISTS ranked_replay_events (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
                         match_id VARCHAR(16),
                         timestamp_ms BIGINT,
                         description TEXT
                     )
-                    """);
-                stmt.execute("""
+                    """));
+                stmt.execute(ddl("""
                     CREATE TABLE IF NOT EXISTS ranked_spectators (
                         match_id VARCHAR(16),
                         uuid VARCHAR(36),
@@ -236,8 +238,8 @@ public final class DatabaseService {
                         joined_at BIGINT,
                         PRIMARY KEY (match_id, uuid)
                     )
-                    """);
-                stmt.execute("""
+                    """));
+                stmt.execute(ddl("""
                     CREATE TABLE IF NOT EXISTS ranked_arenas (
                         name VARCHAR(64) PRIMARY KEY,
                         data TEXT,
@@ -245,8 +247,8 @@ public final class DatabaseService {
                         broken BOOLEAN DEFAULT FALSE,
                         usage_count INT DEFAULT 0
                     )
-                    """);
-                stmt.execute("""
+                    """));
+                stmt.execute(ddl("""
                     CREATE TABLE IF NOT EXISTS ranked_arena_clones (
                         arena_name VARCHAR(64),
                         clone_index INT,
@@ -255,8 +257,8 @@ public final class DatabaseService {
                         offset_z INT DEFAULT 0,
                         PRIMARY KEY (arena_name, clone_index)
                     )
-                    """);
-                stmt.execute("""
+                    """));
+                stmt.execute(ddl("""
                     CREATE TABLE IF NOT EXISTS ranked_rollbacks (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
                         staff_uuid VARCHAR(36),
@@ -266,8 +268,8 @@ public final class DatabaseService {
                         new_values TEXT,
                         created_at BIGINT
                     )
-                    """);
-                stmt.execute("""
+                    """));
+                stmt.execute(ddl("""
                     CREATE TABLE IF NOT EXISTS ranked_dodges (
                         uuid VARCHAR(36) PRIMARY KEY,
                         dodge_count INT DEFAULT 0,
@@ -276,8 +278,8 @@ public final class DatabaseService {
                         hidden_reason TEXT,
                         last_dodge BIGINT DEFAULT 0
                     )
-                    """);
-                stmt.execute("""
+                    """));
+                stmt.execute(ddl("""
                     CREATE TABLE IF NOT EXISTS ranked_punishments (
                         punishment_id VARCHAR(20) PRIMARY KEY,
                         uuid VARCHAR(36),
@@ -291,8 +293,8 @@ public final class DatabaseService {
                         evidence_match_id VARCHAR(16),
                         notes TEXT
                     )
-                    """);
-                stmt.execute("""
+                    """));
+                stmt.execute(ddl("""
                     CREATE TABLE IF NOT EXISTS ranked_punishment_history (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
                         punishment_id VARCHAR(20),
@@ -301,8 +303,8 @@ public final class DatabaseService {
                         staff_uuid VARCHAR(36),
                         created_at BIGINT
                     )
-                    """);
-                stmt.execute("""
+                    """));
+                stmt.execute(ddl("""
                     CREATE TABLE IF NOT EXISTS ranked_staff_notes (
                         note_id VARCHAR(20) PRIMARY KEY,
                         staff_uuid VARCHAR(36),
@@ -312,8 +314,8 @@ public final class DatabaseService {
                         visibility VARCHAR(16) DEFAULT 'STAFF_ONLY',
                         created_at BIGINT
                     )
-                    """);
-                stmt.execute("""
+                    """));
+                stmt.execute(ddl("""
                     CREATE TABLE IF NOT EXISTS ranked_evidence_bundles (
                         bundle_id VARCHAR(20) PRIMARY KEY,
                         target_type VARCHAR(16),
@@ -324,8 +326,8 @@ public final class DatabaseService {
                         created_by VARCHAR(36),
                         created_at BIGINT
                     )
-                    """);
-                stmt.execute("""
+                    """));
+                stmt.execute(ddl("""
                     CREATE TABLE IF NOT EXISTS ranked_kit_checksums (
                         uuid VARCHAR(36),
                         gamemode VARCHAR(32),
@@ -334,17 +336,17 @@ public final class DatabaseService {
                         updated_at BIGINT,
                         PRIMARY KEY (uuid, gamemode)
                     )
-                    """);
-                stmt.execute("""
+                    """));
+                stmt.execute(ddl("""
                     CREATE TABLE IF NOT EXISTS ranked_queue_ghosting (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
                         uuid VARCHAR(36),
                         avoided_uuid VARCHAR(36),
                         leave_count INT DEFAULT 0,
-                        last_event BIGINT
+                        last_event BIGINT,
+                        PRIMARY KEY (uuid, avoided_uuid)
                     )
-                    """);
-                stmt.execute("""
+                    """));
+                stmt.execute(ddl("""
                     CREATE TABLE IF NOT EXISTS ranked_friend_farming (
                         uuid VARCHAR(36),
                         opponent_uuid VARCHAR(36),
@@ -353,8 +355,8 @@ public final class DatabaseService {
                         window_start BIGINT,
                         PRIMARY KEY (uuid, opponent_uuid, gamemode)
                     )
-                    """);
-                stmt.execute("""
+                    """));
+                stmt.execute(ddl("""
                     CREATE TABLE IF NOT EXISTS ranked_rank_protection (
                         uuid VARCHAR(36),
                         gamemode VARCHAR(32),
@@ -362,8 +364,8 @@ public final class DatabaseService {
                         granted_at BIGINT,
                         PRIMARY KEY (uuid, gamemode)
                     )
-                    """);
-                stmt.execute("""
+                    """));
+                stmt.execute(ddl("""
                     CREATE TABLE IF NOT EXISTS ranked_match_quality (
                         match_id VARCHAR(16) PRIMARY KEY,
                         quality INT DEFAULT 0,
@@ -373,8 +375,8 @@ public final class DatabaseService {
                         ping_diff INT DEFAULT 0,
                         queue_range INT DEFAULT 0
                     )
-                    """);
-                stmt.execute("""
+                    """));
+                stmt.execute(ddl("""
                     CREATE TABLE IF NOT EXISTS ranked_region_history (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
                         uuid VARCHAR(36),
@@ -382,8 +384,8 @@ public final class DatabaseService {
                         new_region VARCHAR(32),
                         changed_at BIGINT
                     )
-                    """);
-                stmt.execute("""
+                    """));
+                stmt.execute(ddl("""
                     CREATE TABLE IF NOT EXISTS ranked_upsets (
                         uuid VARCHAR(36),
                         gamemode VARCHAR(32),
@@ -392,8 +394,8 @@ public final class DatabaseService {
                         highest_beaten DOUBLE DEFAULT 0,
                         PRIMARY KEY (uuid, gamemode)
                     )
-                    """);
-                stmt.execute("""
+                    """));
+                stmt.execute(ddl("""
                     CREATE TABLE IF NOT EXISTS ranked_behavior_fingerprints (
                         uuid VARCHAR(36),
                         gamemode VARCHAR(32),
@@ -403,7 +405,7 @@ public final class DatabaseService {
                         updated_at BIGINT,
                         PRIMARY KEY (uuid, gamemode)
                     )
-                    """);
+                    """));
                 migrateColumns(stmt);
             }
         });
@@ -412,6 +414,40 @@ public final class DatabaseService {
     private void migrateColumns(Statement stmt) {
         try { stmt.execute("ALTER TABLE ranked_profiles ADD COLUMN hidden_mmr DOUBLE DEFAULT 1500"); } catch (SQLException ignored) {}
         try { stmt.execute("ALTER TABLE ranked_match_quality ADD COLUMN matchmaking_reason TEXT"); } catch (SQLException ignored) {}
+        migrateQueueGhosting(stmt);
+    }
+
+    private void migrateQueueGhosting(Statement stmt) {
+        try {
+            boolean hasLegacyId = false;
+            try (var rs = stmt.executeQuery("PRAGMA table_info(ranked_queue_ghosting)")) {
+                while (rs.next()) {
+                    if ("id".equalsIgnoreCase(rs.getString("name"))) {
+                        hasLegacyId = true;
+                        break;
+                    }
+                }
+            }
+            if (!hasLegacyId) return;
+            stmt.execute("""
+                CREATE TABLE IF NOT EXISTS ranked_queue_ghosting_migrated (
+                    uuid VARCHAR(36),
+                    avoided_uuid VARCHAR(36),
+                    leave_count INT DEFAULT 0,
+                    last_event BIGINT,
+                    PRIMARY KEY (uuid, avoided_uuid)
+                )
+                """);
+            stmt.execute("""
+                INSERT OR IGNORE INTO ranked_queue_ghosting_migrated (uuid, avoided_uuid, leave_count, last_event)
+                SELECT uuid, avoided_uuid, MAX(leave_count), MAX(last_event)
+                FROM ranked_queue_ghosting GROUP BY uuid, avoided_uuid
+                """);
+            stmt.execute("DROP TABLE ranked_queue_ghosting");
+            stmt.execute("ALTER TABLE ranked_queue_ghosting_migrated RENAME TO ranked_queue_ghosting");
+        } catch (SQLException ignored) {
+            // MySQL or already migrated — table may already use composite PK.
+        }
     }
 
     public Connection getConnection() throws SQLException {
@@ -453,6 +489,21 @@ public final class DatabaseService {
 
     public String databaseType() {
         return databaseType;
+    }
+
+    public SqlDialect dialect() {
+        return dialect;
+    }
+
+    /** Adapts SQLite {@code INSERT OR REPLACE} statements for the active dialect. */
+    public String sql(String sqliteSql) {
+        return dialect.replaceInto(sqliteSql);
+    }
+
+    private String ddl(String sql) {
+        if (!dialect.isMysql()) return sql;
+        return sql.replace("INTEGER PRIMARY KEY AUTOINCREMENT", "INT AUTO_INCREMENT PRIMARY KEY")
+                .replace("AUTOINCREMENT", "AUTO_INCREMENT");
     }
 
     public void shutdown() {
