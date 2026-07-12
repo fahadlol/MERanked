@@ -267,7 +267,42 @@ public final class GuiManager {
         inv.setItem(16, item(Material.ENDER_CHEST, "Ender Chest", "View ender chest"));
         inv.setItem(28, item(Material.PAPER, "Validation", services.kitValidation().validate(target, gamemode).summary()));
         inv.setItem(30, item(Material.TNT, "Reset Kit", "Reset player kit"));
-        inv.setItem(32, item(Material.EMERALD, "Copy Kit", "Copy to another player"));
+        inv.setItem(32, item(Material.EMERALD, "Copy Kit", "Copy kit to your account"));
+        inv.setItem(34, item(Material.REDSTONE, "Flag Player", "Add to watchlist + suspicion"));
+        setSession(staff, new GuiSession(GuiType.KIT_AUDIT, target.toString(), gamemode));
+        staff.openInventory(inv);
+    }
+
+    public void openKitPreview(Player staff, UUID target, String gamemode, String section) {
+        var kit = services.kits().getKit(target, gamemode);
+        String name = Bukkit.getOfflinePlayer(target).getName();
+        if (name == null) name = target.toString();
+        Inventory inv = switch (section) {
+            case "armor" -> {
+                Inventory i = Bukkit.createInventory(null, 27, TextUtil.parse("Kit Armor — " + name));
+                ItemStack[] armor = kit.armor();
+                for (int s = 0; s < armor.length && s < 4; s++) {
+                    if (armor[s] != null) i.setItem(s, armor[s].clone());
+                }
+                yield i;
+            }
+            case "ender" -> {
+                Inventory i = Bukkit.createInventory(null, 27, TextUtil.parse("Kit Ender — " + name));
+                ItemStack[] ender = kit.enderChest();
+                for (int s = 0; s < ender.length && s < 27; s++) {
+                    if (ender[s] != null) i.setItem(s, ender[s].clone());
+                }
+                yield i;
+            }
+            default -> {
+                Inventory i = Bukkit.createInventory(null, 54, TextUtil.parse("Kit Inventory — " + name));
+                ItemStack[] items = kit.inventory();
+                for (int s = 0; s < items.length && s < 41; s++) {
+                    if (items[s] != null) i.setItem(s, items[s].clone());
+                }
+                yield i;
+            }
+        };
         setSession(staff, new GuiSession(GuiType.KIT_AUDIT, target.toString(), gamemode));
         staff.openInventory(inv);
     }
@@ -364,24 +399,40 @@ public final class GuiManager {
 
     public void openIdentityCard(Player viewer, UUID target, String targetName) {
         FileConfiguration cfg = configService.get("identity-card.yml");
+        if (!cfg.getBoolean("identity-card.enabled", true)) {
+            viewer.sendMessage("§cIdentity cards are disabled.");
+            return;
+        }
         var rp = services.profiles().getPlayer(target);
         String region = rp == null ? "Other" : (rp.regionHidden() ? "Hidden" : rp.region());
+        Material headMat = Material.matchMaterial(cfg.getString("identity-card.gui-item", "PLAYER_HEAD"));
+        if (headMat == null) headMat = Material.PLAYER_HEAD;
         Inventory inv = Bukkit.createInventory(null, 45, TextUtil.parse(
-                cfg.getString("title", "<gold><player></gold>").replace("<player>", targetName).replace("<region>", region)));
+                cfg.getString("identity-card.title", "<gold><player></gold>")
+                        .replace("<player>", targetName).replace("<region>", region)));
 
-        ItemStack skull = new ItemStack(Material.PLAYER_HEAD);
-        SkullMeta meta = (SkullMeta) skull.getItemMeta();
-        meta.setOwningPlayer(Bukkit.getOfflinePlayer(target));
-        meta.displayName(TextUtil.parse("<gold>" + targetName + " [" + region + "]</gold>"));
-        skull.setItemMeta(meta);
+        ItemStack skull = new ItemStack(headMat);
+        if (skull.getItemMeta() instanceof SkullMeta meta) {
+            meta.setOwningPlayer(Bukkit.getOfflinePlayer(target));
+            meta.displayName(TextUtil.parse("<gold>" + targetName + " [" + region + "]</gold>"));
+            skull.setItemMeta(meta);
+        }
         inv.setItem(4, skull);
 
-        // per-gamemode tiers
+        java.util.List<String> shownModes = cfg.getStringList("identity-card.shown-gamemodes");
+        java.util.List<String> modes = shownModes.isEmpty() ? services.profiles().enabledGamemodes() : shownModes;
+        boolean showPeak = cfg.getBoolean("identity-card.show-peak-tier", true);
+        boolean showConfidence = cfg.getBoolean("identity-card.show-confidence", true);
+        boolean showSeasonRank = cfg.getBoolean("identity-card.show-season-rank", true);
+        boolean showWinRate = cfg.getBoolean("identity-card.show-win-rate", true);
+        boolean showStreak = cfg.getBoolean("identity-card.show-streak", true);
+
         int slot = 19;
         RankedProfile best = null;
-        int totalWins = 0, totalLosses = 0, bestStreak = 0;
+        int totalWins = 0, totalLosses = 0;
+        String bestStreakLabel = "No Streak";
         String mainTier = "#0";
-        for (String mode : services.profiles().enabledGamemodes()) {
+        for (String mode : modes) {
             RankedProfile p = services.profiles().getProfile(target, mode);
             if (!p.ranked()) continue;
             if (slot <= 25) {
@@ -390,7 +441,7 @@ public final class GuiManager {
             }
             totalWins += p.wins();
             totalLosses += p.losses();
-            bestStreak = Math.max(bestStreak, p.winStreak());
+            if (p.winStreak() > 0 || p.lossStreak() > 0) bestStreakLabel = p.streakLabel();
             if (best == null || p.rating() > best.rating()) { best = p; mainTier = p.tier(); }
         }
         int rate = totalWins + totalLosses == 0 ? 0 : Math.round(100f * totalWins / (totalWins + totalLosses));
@@ -398,13 +449,17 @@ public final class GuiManager {
         int seasonRank = best == null ? 0 : services.leaderboard().getRankCached(target, bestMode);
 
         inv.setItem(29, item(Material.GOLD_INGOT, "<gold>Main Tier</gold>", mainTier));
-        inv.setItem(30, item(Material.DIAMOND, "<gold>Peak Tier</gold>", best == null ? "N/A" : best.peakTier()));
+        if (showPeak) inv.setItem(30, item(Material.DIAMOND, "<gold>Peak Tier</gold>", best == null ? "N/A" : best.peakTier()));
         inv.setItem(31, item(Material.NETHERITE_SWORD, "<gold>Best Gamemode</gold>", bestMode));
-        inv.setItem(32, item(Material.EXPERIENCE_BOTTLE, "<gold>Confidence</gold>",
-                best == null ? "N/A" : tierService.getConfidenceLabel(best.ratingDeviation())));
-        inv.setItem(33, item(Material.PAPER, "<gold>Season Rank</gold>", seasonRank <= 0 ? "Unranked" : "#" + seasonRank));
-        inv.setItem(38, item(Material.BOOK, "<gold>Win Rate</gold>", rate + "%"));
-        inv.setItem(42, item(Material.BLAZE_POWDER, "<gold>Current Streak</gold>", bestStreak + "W"));
+        if (showConfidence) {
+            inv.setItem(32, item(Material.EXPERIENCE_BOTTLE, "<gold>Confidence</gold>",
+                    best == null ? "N/A" : tierService.getConfidenceLabel(best.ratingDeviation())));
+        }
+        if (showSeasonRank) {
+            inv.setItem(33, item(Material.PAPER, "<gold>Season Rank</gold>", seasonRank <= 0 ? "Unranked" : "#" + seasonRank));
+        }
+        if (showWinRate) inv.setItem(38, item(Material.BOOK, "<gold>Win Rate</gold>", rate + "%"));
+        if (showStreak) inv.setItem(42, item(Material.BLAZE_POWDER, "<gold>Current Streak</gold>", bestStreakLabel));
         inv.setItem(40, item(Material.BARRIER, "<red>Close</red>", "Close identity card"));
         setSession(viewer, GuiSession.of(GuiType.IDENTITY_CARD, target.toString()));
         viewer.openInventory(inv);
@@ -453,6 +508,10 @@ public final class GuiManager {
 
     public void openStaffCenter(Player staff) {
         FileConfiguration cfg = configService.get("staff-center.yml");
+        if (!cfg.getBoolean("staff-center.enabled", true)) {
+            staff.sendMessage("§cStaff center is disabled.");
+            return;
+        }
         int size = cfg.getInt("staff-center.size", 54);
         Inventory inv = Bukkit.createInventory(null, size, TextUtil.parse(
                 cfg.getString("staff-center.title", "MERanked Staff Center")));

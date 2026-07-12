@@ -414,17 +414,33 @@ public final class DatabaseService {
     private void migrateColumns(Statement stmt) {
         try { stmt.execute("ALTER TABLE ranked_profiles ADD COLUMN hidden_mmr DOUBLE DEFAULT 1500"); } catch (SQLException ignored) {}
         try { stmt.execute("ALTER TABLE ranked_match_quality ADD COLUMN matchmaking_reason TEXT"); } catch (SQLException ignored) {}
+        try { stmt.execute("ALTER TABLE ranked_profiles ADD COLUMN placement_cap_override VARCHAR(8)"); } catch (SQLException ignored) {}
+        try { stmt.execute("ALTER TABLE ranked_profiles ADD COLUMN placement_behavior_bias DOUBLE DEFAULT 0"); } catch (SQLException ignored) {}
+        try { stmt.execute("ALTER TABLE ranked_profiles ADD COLUMN loss_streak INT DEFAULT 0"); } catch (SQLException ignored) {}
+        try { stmt.execute("ALTER TABLE ranked_profiles ADD COLUMN placement_opponent_rating_sum DOUBLE DEFAULT 0"); } catch (SQLException ignored) {}
+        try { stmt.execute("ALTER TABLE ranked_profiles ADD COLUMN worst_placement_loss_rating DOUBLE DEFAULT 0"); } catch (SQLException ignored) {}
+        try { stmt.execute("ALTER TABLE ranked_profiles ADD COLUMN upset_wins INT DEFAULT 0"); } catch (SQLException ignored) {}
+        try { stmt.execute("ALTER TABLE ranked_profiles ADD COLUMN highest_beaten_rating DOUBLE DEFAULT 0"); } catch (SQLException ignored) {}
         migrateQueueGhosting(stmt);
     }
 
     private void migrateQueueGhosting(Statement stmt) {
         try {
             boolean hasLegacyId = false;
-            try (var rs = stmt.executeQuery("PRAGMA table_info(ranked_queue_ghosting)")) {
-                while (rs.next()) {
-                    if ("id".equalsIgnoreCase(rs.getString("name"))) {
-                        hasLegacyId = true;
-                        break;
+            if ("MYSQL".equals(databaseType)) {
+                try (var rs = stmt.executeQuery("""
+                    SELECT COUNT(*) AS cnt FROM information_schema.COLUMNS
+                    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'ranked_queue_ghosting' AND COLUMN_NAME = 'id'
+                    """)) {
+                    if (rs.next() && rs.getInt("cnt") > 0) hasLegacyId = true;
+                }
+            } else {
+                try (var rs = stmt.executeQuery("PRAGMA table_info(ranked_queue_ghosting)")) {
+                    while (rs.next()) {
+                        if ("id".equalsIgnoreCase(rs.getString("name"))) {
+                            hasLegacyId = true;
+                            break;
+                        }
                     }
                 }
             }
@@ -438,15 +454,22 @@ public final class DatabaseService {
                     PRIMARY KEY (uuid, avoided_uuid)
                 )
                 """);
-            stmt.execute("""
-                INSERT OR IGNORE INTO ranked_queue_ghosting_migrated (uuid, avoided_uuid, leave_count, last_event)
-                SELECT uuid, avoided_uuid, MAX(leave_count), MAX(last_event)
-                FROM ranked_queue_ghosting GROUP BY uuid, avoided_uuid
-                """);
+            String insertSql = "MYSQL".equals(databaseType)
+                    ? """
+                    INSERT IGNORE INTO ranked_queue_ghosting_migrated (uuid, avoided_uuid, leave_count, last_event)
+                    SELECT uuid, avoided_uuid, MAX(leave_count), MAX(last_event)
+                    FROM ranked_queue_ghosting GROUP BY uuid, avoided_uuid
+                    """
+                    : """
+                    INSERT OR IGNORE INTO ranked_queue_ghosting_migrated (uuid, avoided_uuid, leave_count, last_event)
+                    SELECT uuid, avoided_uuid, MAX(leave_count), MAX(last_event)
+                    FROM ranked_queue_ghosting GROUP BY uuid, avoided_uuid
+                    """;
+            stmt.execute(insertSql);
             stmt.execute("DROP TABLE ranked_queue_ghosting");
             stmt.execute("ALTER TABLE ranked_queue_ghosting_migrated RENAME TO ranked_queue_ghosting");
         } catch (SQLException ignored) {
-            // MySQL or already migrated — table may already use composite PK.
+            // Already migrated or table does not exist yet.
         }
     }
 

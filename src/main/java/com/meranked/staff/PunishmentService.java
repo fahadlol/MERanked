@@ -194,6 +194,20 @@ public final class PunishmentService {
         }).join();
     }
 
+    /** Active ranked/queue bans for staff listings. */
+    public List<Punishment> activeRankedRestrictions() {
+        List<Punishment> all = new ArrayList<>();
+        for (List<Punishment> list : cache.values()) {
+            for (Punishment p : list) {
+                if (p.isActive() && (p.type() == Type.RANKEDBAN || p.type() == Type.QUEUEBAN)) {
+                    all.add(p);
+                }
+            }
+        }
+        all.sort((a, b) -> Long.compare(b.startTime(), a.startTime()));
+        return all;
+    }
+
     private void logHistory(java.sql.Connection conn, String pid, UUID uuid, String action, UUID staff) throws java.sql.SQLException {
         try (PreparedStatement ps = conn.prepareStatement("""
             INSERT INTO ranked_punishment_history (punishment_id, uuid, action, staff_uuid, created_at)

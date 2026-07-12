@@ -38,9 +38,15 @@ public final class SuspicionService {
     }
 
     public void addScore(UUID uuid, int amount, String reason) {
-        int newScore = Math.min(100, getScore(uuid) + amount);
+        FileConfiguration config = configService.get("suspicion.yml");
+        if (!config.getBoolean("enabled", true)) return;
+        int maxScore = config.getInt("max-score", 100);
+        int newScore = Math.min(maxScore, getScore(uuid) + amount);
         cache.put(uuid, newScore);
         saveScore(uuid, newScore);
+        if (reason != null && !reason.isBlank()) {
+            plugin.getLogger().info("[Suspicion] " + uuid + " +" + amount + " (" + reason + ") -> " + newScore);
+        }
     }
 
     public void lowerScore(UUID uuid, int amount) {

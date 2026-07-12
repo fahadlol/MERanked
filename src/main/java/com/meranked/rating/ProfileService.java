@@ -155,8 +155,10 @@ public final class ProfileService {
                 (uuid, gamemode, rating, rating_deviation, volatility, tier, peak_rating, peak_tier,
                  peak_date, season_peak_rating, season_peak_tier, ranked, placement_played, placement_wins,
                  placement_losses, wins, losses, win_streak, best_win_opponent, best_win_tier, last_played,
-                 decay_active, rank_protection, season_id, hidden_mmr)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                 decay_active, rank_protection, season_id, hidden_mmr, placement_cap_override,
+                 placement_behavior_bias, loss_streak, placement_opponent_rating_sum, worst_placement_loss_rating,
+                 upset_wins, highest_beaten_rating)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                 """))) {
                 for (RankedProfile p : batch) {
                     bindProfile(ps, p);
@@ -193,6 +195,13 @@ public final class ProfileService {
         ps.setInt(23, p.rankProtection());
         ps.setInt(24, p.seasonId());
         ps.setDouble(25, p.hiddenMmr());
+        ps.setString(26, p.placementCapOverride());
+        ps.setDouble(27, p.placementBehaviorBias());
+        ps.setInt(28, p.lossStreak());
+        ps.setDouble(29, p.placementOpponentRatingSum());
+        ps.setDouble(30, p.worstPlacementLossRating());
+        ps.setInt(31, p.upsetWins());
+        ps.setDouble(32, p.highestBeatenRating());
     }
 
     private RankedProfile loadProfileSync(UUID uuid, String gamemode) {
@@ -261,6 +270,13 @@ public final class ProfileService {
         p.setRankProtection(rs.getInt("rank_protection"));
         p.setSeasonId(rs.getInt("season_id"));
         p.setHiddenMmr(rs.getDouble("hidden_mmr"));
+        try { p.setPlacementCapOverride(rs.getString("placement_cap_override")); } catch (java.sql.SQLException ignored) {}
+        try { p.setPlacementBehaviorBias(rs.getDouble("placement_behavior_bias")); } catch (java.sql.SQLException ignored) {}
+        try { p.setLossStreak(rs.getInt("loss_streak")); } catch (java.sql.SQLException ignored) {}
+        try { p.setPlacementOpponentRatingSum(rs.getDouble("placement_opponent_rating_sum")); } catch (java.sql.SQLException ignored) {}
+        try { p.setWorstPlacementLossRating(rs.getDouble("worst_placement_loss_rating")); } catch (java.sql.SQLException ignored) {}
+        try { p.setUpsetWins(rs.getInt("upset_wins")); } catch (java.sql.SQLException ignored) {}
+        try { p.setHighestBeatenRating(rs.getDouble("highest_beaten_rating")); } catch (java.sql.SQLException ignored) {}
         return p;
     }
 

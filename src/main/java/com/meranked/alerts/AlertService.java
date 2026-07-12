@@ -93,6 +93,25 @@ public final class AlertService {
         });
     }
 
+    /** Resolves all unresolved alerts tied to a finished match (used after rollbacks). */
+    public void resolveAlertsForMatch(String matchId) {
+        if (matchId == null || matchId.isEmpty()) return;
+        recentAlerts.stream()
+                .filter(a -> matchId.equals(a.matchId()) && !a.resolved())
+                .map(StaffAlert::alertId)
+                .toList()
+                .forEach(this::resolveAlert);
+        database.executeAsync(conn -> {
+            try (PreparedStatement ps = conn.prepareStatement(
+                    "UPDATE ranked_alerts SET resolved = TRUE WHERE match_id = ? AND resolved = FALSE")) {
+                ps.setString(1, matchId);
+                ps.executeUpdate();
+            } catch (java.sql.SQLException ex) {
+                plugin.getLogger().severe("Failed to resolve match alerts: " + ex.getMessage());
+            }
+        });
+    }
+
     private void saveAlertAsync(StaffAlert alert) {
         database.executeAsync(conn -> {
             try {

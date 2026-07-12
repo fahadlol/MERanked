@@ -1,5 +1,6 @@
 enabled: true
 max-score: 100
+staff-list-threshold: 30
 decay-per-day: 2
 decay-enabled: true
 

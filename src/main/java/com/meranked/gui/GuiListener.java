@@ -183,9 +183,31 @@ public final class GuiListener implements Listener {
     private void handleKitAudit(Player staff, GuiSession session, int slot) {
         UUID target = UUID.fromString(session.context());
         String gamemode = session.subContext();
-        if (slot == 30) {
-            services.kits().resetKit(target, gamemode);
-            staff.sendMessage("§aKit reset.");
+        String targetName = Bukkit.getOfflinePlayer(target).getName();
+        if (targetName == null) targetName = target.toString();
+        switch (slot) {
+            case 10 -> services.gui().openKitPreview(staff, target, gamemode, "inventory");
+            case 12 -> services.gui().openKitPreview(staff, target, gamemode, "armor");
+            case 14 -> staff.sendMessage("§6Validation: §f" + services.kitValidation().validate(target, gamemode).summary());
+            case 16 -> services.gui().openKitPreview(staff, target, gamemode, "ender");
+            case 30 -> {
+                services.kits().resetKit(target, gamemode);
+                staff.sendMessage("§aKit reset.");
+            }
+            case 32 -> {
+                if (staff.getUniqueId().equals(target)) {
+                    staff.sendMessage("§cCannot copy kit onto the same player.");
+                    return;
+                }
+                services.kits().copyKit(target, staff.getUniqueId(), gamemode);
+                staff.sendMessage("§aCopied " + targetName + "'s " + gamemode + " kit to your saved kit.");
+            }
+            case 34 -> {
+                services.suspicion().addScore(target, 10, "Kit flagged by " + staff.getName());
+                services.watchlist().add(target, targetName, staff.getName(), "Kit audit flag");
+                staff.sendMessage("§aFlagged " + targetName + " (watchlist + suspicion).");
+            }
+            default -> {}
         }
     }
 
@@ -268,6 +290,49 @@ public final class GuiListener implements Listener {
         } else if (slot == cfg.getInt("staff-center.items.live-matches", 10)) {
             player.closeInventory();
             player.performCommand("matches");
+        } else if (slot == cfg.getInt("staff-center.items.broken-arenas", 28)) {
+            player.closeInventory();
+            var broken = services.arenas().allArenas().stream().filter(a -> a.broken()).toList();
+            if (broken.isEmpty()) player.sendMessage("§aNo broken arenas.");
+            else {
+                player.sendMessage("§cBroken arenas:");
+                broken.forEach(a -> player.sendMessage("§7- §f" + a.name() + "§7: " + a.brokenReason()));
+            }
+        } else if (slot == cfg.getInt("staff-center.items.kit-audits", 30)) {
+            player.closeInventory();
+            player.sendMessage("§eUse §f/ranked kit audit <player> <gamemode>§e to inspect a kit.");
+        } else if (slot == cfg.getInt("staff-center.items.rollback-logs", 32)) {
+            player.closeInventory();
+            var logs = services.rollback().recentLogs(10);
+            if (logs.isEmpty()) player.sendMessage("§7No rollback logs.");
+            else {
+                player.sendMessage("§6Recent rollbacks:");
+                for (var log : logs) {
+                    String staff = Bukkit.getOfflinePlayer(log.staffUuid()).getName();
+                    player.sendMessage("§7- §f" + log.matchId() + " §7by §f" + staff + "§7: " + log.reason());
+                }
+            }
+        } else if (slot == cfg.getInt("staff-center.items.evidence-bundles", 34)) {
+            player.closeInventory();
+            var bundles = services.evidence().recentBundles(10);
+            if (bundles.isEmpty()) player.sendMessage("§7No evidence bundles.");
+            else {
+                player.sendMessage("§6Recent evidence bundles:");
+                for (var b : bundles) {
+                    player.sendMessage("§7- §f" + b.bundleId() + " §7(" + b.targetType() + " " + b.targetId() + ") §7suspicion " + b.suspicion());
+                }
+            }
+        } else if (slot == cfg.getInt("staff-center.items.ranked-bans", 40)) {
+            player.closeInventory();
+            var bans = services.punishments().activeRankedRestrictions();
+            if (bans.isEmpty()) player.sendMessage("§aNo active ranked or queue bans.");
+            else {
+                player.sendMessage("§cActive ranked restrictions:");
+                for (var p : bans) {
+                    String name = Bukkit.getOfflinePlayer(p.uuid()).getName();
+                    player.sendMessage("§7- §f" + (name == null ? p.uuid() : name) + " §7[" + p.type() + "] §7" + p.reason());
+                }
+            }
         }
     }
 
