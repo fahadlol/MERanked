@@ -263,10 +263,16 @@ public final class MatchService {
 
     public void handleDisconnect(Player player) {
         getMatch(player.getUniqueId()).ifPresent(match -> {
-            // Once the match has gone live (including between Best-of-3 rounds), a disconnect is a full loss.
-            // Before it starts, it is treated as a dodge and the match is cancelled.
+            FileConfiguration boostCfg = services.config().get("anti-boost.yml");
+            boolean countsAsLoss = boostCfg.getBoolean("disconnect.counts-as-loss", true);
             if (match.hasStarted()) {
-                endMatch(match, match.opponent(player.getUniqueId()), player.getUniqueId(), true);
+                if (countsAsLoss) {
+                    endMatch(match, match.opponent(player.getUniqueId()), player.getUniqueId(), true);
+                } else {
+                    match.setNoRatingChange(true);
+                    match.setNoRatingReason("DISCONNECT");
+                    cancelMatch(match, "Disconnect (no rating)");
+                }
             } else {
                 services.antiDodge().recordDodge(player.getUniqueId());
                 cancelMatch(match, "Disconnect before start");
@@ -299,12 +305,31 @@ public final class MatchService {
 
         AntiBoostService.ValidationResult validation = services.antiBoost().validate(
                 match.player1(), match.player2(), ip1, ip2, match.durationMillis());
+        FileConfiguration boostCfg = services.config().get("anti-boost.yml");
 
         if (!validation.allowed()) {
             match.setNoRatingChange(true);
             match.setNoRatingReason(validation.reason());
             services.alerts().createAlert("SAME_IP_MATCH".equals(validation.reason()) ? "SAME_IP_MATCH" : "SHORT_MATCH",
                     AlertSeverity.MEDIUM, validation.reason(), match, List.of(winner, loser));
+            if ("SAME_IP".equals(validation.reason()) && boostCfg.getBoolean("suspicious.flag-same-ip", true)) {
+                services.suspicion().addFactor(winner, "same-ip-match", "Same IP rated match blocked");
+                services.suspicion().addFactor(loser, "same-ip-match", "Same IP rated match blocked");
+            }
+            if ("OPPONENT_LIMIT".equals(validation.reason()) && boostCfg.getBoolean("suspicious.flag-repeated-opponents", true)) {
+                services.suspicion().addFactor(winner, "repeated-opponent", "Daily opponent limit reached");
+                services.suspicion().addFactor(loser, "repeated-opponent", "Daily opponent limit reached");
+            }
+            if ("SHORT_MATCH".equals(validation.reason()) && boostCfg.getBoolean("suspicious.flag-short-wins", true)) {
+                services.suspicion().addFactor(winner, "short-win", "Short match win");
+            }
+        }
+
+        if (disconnect) {
+            services.suspicion().addFactor(loser, "disconnect-pattern", "Disconnect during match");
+            services.replays().recordCombatEvent(match, "DISCONNECT",
+                    com.meranked.util.TextUtil.formatMatchTime(match.durationMillis()) + " - "
+                            + Bukkit.getOfflinePlayer(loser).getName() + " disconnected");
         }
 
         computeMatchQuality(match);
@@ -437,6 +462,12 @@ public final class MatchService {
         }
 
         services.suspicion().checkRatingSpike(winner, winUpdate.change());
+
+        FileConfiguration suspicionCfg = services.config().get("suspicion.yml");
+        int streakThreshold = suspicionCfg.getInt("unusual-win-streak-threshold", 8);
+        if (!winProfile.inPlacements(required) && winProfile.winStreak() >= streakThreshold) {
+            services.suspicion().addFactor(winner, "unusual-win-streak", "Win streak " + winProfile.winStreak());
+        }
     }
 
     private void announceHotStreak(UUID uuid, RankedProfile profile) {
@@ -524,11 +555,15 @@ public final class MatchService {
     private void sendCoachingInsights(Player player, RankedMatch match, UUID uuid) {
         if (player == null || !services.coachingInsights().enabled()) return;
         FileConfiguration cfg = services.config().get("coaching-insights.yml");
-        if (!cfg.getBoolean("coaching-insights.show-in-chat", true)) return;
-        int ping = player.getPing();
-        for (String line : services.coachingInsights().insights(match, uuid, ping)) {
-            if (line == null || line.isBlank()) continue;
-            player.sendMessage(services.messages().format(line));
+        java.util.List<String> insights = services.coachingInsights().insights(match, uuid, player.getPing()).stream()
+                .filter(line -> line != null && !line.isBlank())
+                .toList();
+        if (insights.isEmpty()) return;
+        if (cfg.getBoolean("coaching-insights.show-in-chat", true)) {
+            for (String line : insights) player.sendMessage(services.messages().format(line));
+        }
+        if (cfg.getBoolean("coaching-insights.show-in-actionbar", false)) {
+            player.sendActionBar(services.messages().format(insights.get(0)));
         }
     }
 
@@ -601,11 +636,11 @@ public final class MatchService {
     private void saveParticipantsAsync(RankedMatch match) {
         services.database().executeAsync(conn -> {
             for (UUID uuid : List.of(match.player1(), match.player2())) {
-                try (PreparedStatement ps = conn.prepareStatement("""
+                try (PreparedStatement ps = conn.prepareStatement(services.database().sql("""
                     INSERT OR REPLACE INTO ranked_match_participants
                     (match_id, uuid, rating_before, rating_after, tier_before, tier_after, rating_change, ping)
                     VALUES (?,?,?,?,?,?,?,?)
-                    """)) {
+                    """))) {
                     double before = match.ratingBefore().getOrDefault(uuid, 0.0);
                     double after = match.ratingAfter().getOrDefault(uuid, before);
                     Player p = Bukkit.getPlayer(uuid);
@@ -666,18 +701,28 @@ public final class MatchService {
 
     private void saveMatchAsync(RankedMatch match) {
         DatabaseService db = services.database();
+        int suspicionThreshold = services.config().get("suspicion.yml").getInt("staff-list-threshold", 30);
+        boolean suspicious = false;
+        if (match.winner() != null) suspicious = services.suspicion().getScore(match.winner()) >= suspicionThreshold;
+        if (!suspicious && match.loser() != null) suspicious = services.suspicion().getScore(match.loser()) >= suspicionThreshold;
+
+        boolean finalSuspicious = suspicious;
+        if (suspicious) {
+            if (match.winner() != null) services.suspicion().addFactor(match.winner(), "flagged-match", "Suspicious match");
+            if (match.loser() != null) services.suspicion().addFactor(match.loser(), "flagged-match", "Suspicious match");
+        }
         db.executeAsync(conn -> {
-            try (PreparedStatement ps = conn.prepareStatement("""
+            try (PreparedStatement ps = conn.prepareStatement(db.sql("""
                 INSERT OR REPLACE INTO ranked_matches
                 (match_id, gamemode, arena, winner, loser, duration, started_at, ended_at,
-                 no_rating, no_rating_reason, dodge, season_id)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
-                """)) {
+                 no_rating, no_rating_reason, dodge, season_id, suspicious)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
+                """))) {
                 ps.setString(1, match.matchId());
                 ps.setString(2, match.gamemode());
                 ps.setString(3, match.arenaName());
-                ps.setString(4, match.winner().toString());
-                ps.setString(5, match.loser().toString());
+                ps.setString(4, match.winner() == null ? null : match.winner().toString());
+                ps.setString(5, match.loser() == null ? null : match.loser().toString());
                 ps.setLong(6, match.durationMillis());
                 ps.setLong(7, match.startedAt());
                 ps.setLong(8, System.currentTimeMillis());
@@ -685,6 +730,7 @@ public final class MatchService {
                 ps.setString(10, match.noRatingReason());
                 ps.setBoolean(11, match.dodge());
                 ps.setInt(12, services.seasons().currentSeasonId());
+                ps.setBoolean(13, finalSuspicious);
                 ps.executeUpdate();
             }
         });

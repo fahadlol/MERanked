@@ -73,10 +73,10 @@ public final class KitService {
         String armorData = ItemSerializer.toBase64(armor);
         String enderData = ItemSerializer.toBase64(kit.enderChest());
         database.executeAsync(conn -> {
-            try (PreparedStatement ps = conn.prepareStatement("""
+            try (PreparedStatement ps = conn.prepareStatement(database.sql("""
                 INSERT OR REPLACE INTO ranked_kits (uuid, gamemode, kit_data, ender_chest_data, updated_at)
                 VALUES (?, ?, ?, ?, ?)
-                """)) {
+                """))) {
                 ps.setString(1, uuid.toString());
                 ps.setString(2, gamemode);
                 ps.setString(3, invData + "||" + armorData);
@@ -140,21 +140,13 @@ public final class KitService {
         Object invObj = kits.get("defaults." + kitId + ".inventory");
         Object armorObj = kits.get("defaults." + kitId + ".armor");
 
-        ItemStack[] inv = toArray(invObj, 41);
-        ItemStack[] armor = toArray(armorObj, 4);
+        ItemStack[] inv = KitYamlParser.parse(invObj, 41);
+        ItemStack[] armor = KitYamlParser.parse(armorObj, 4);
         return new StoredKit(inv, armor, new ItemStack[27]);
     }
 
-    @SuppressWarnings("unchecked")
-    private ItemStack[] toArray(Object obj, int size) {
-        if (obj instanceof java.util.List<?> list) {
-            ItemStack[] arr = new ItemStack[Math.max(size, list.size())];
-            for (int i = 0; i < list.size(); i++) {
-                if (list.get(i) instanceof ItemStack is) arr[i] = is;
-            }
-            return arr;
-        }
-        return new ItemStack[size];
+    public void reloadDefaults() {
+        cache.clear();
     }
 
     private ItemStack[] padTo(ItemStack[] items, int size) {
@@ -162,10 +154,6 @@ public final class KitService {
         ItemStack[] arr = new ItemStack[size];
         System.arraycopy(items, 0, arr, 0, items.length);
         return arr;
-    }
-
-    public void reloadDefaults() {
-        cache.clear();
     }
 
     public record StoredKit(ItemStack[] inventory, ItemStack[] armor, ItemStack[] enderChest) {}

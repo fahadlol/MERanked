@@ -56,18 +56,25 @@ public final class ScoreboardService {
         FileConfiguration config = configService.get("scoreboards.yml");
         List<String> lines = config.getStringList("spawn.lines");
         var rp = services.profiles().getPlayer(player.getUniqueId());
-        RankedProfile mace = services.profiles().getProfile(player.getUniqueId(), "Mace");
-        RankedProfile crystal = services.profiles().getProfile(player.getUniqueId(), "Crystal");
+        var modes = services.profiles().enabledGamemodes();
+        String mode1 = modes.size() > 0 ? modes.get(0) : "Mace";
+        String mode2 = modes.size() > 1 ? modes.get(1) : mode1;
+        RankedProfile first = services.profiles().getProfile(player.getUniqueId(), mode1);
+        RankedProfile second = services.profiles().getProfile(player.getUniqueId(), mode2);
         Map<String, String> ph = new HashMap<>();
         ph.put("player", player.getName());
         ph.put("region", rp.regionHidden() ? "Hidden" : rp.region());
         ph.put("season", String.valueOf(services.seasons().currentSeasonId()));
-        ph.put("mace_tier", services.placements().displayTier(mace));
-        ph.put("crystal_tier", services.placements().displayTier(crystal));
+        ph.put("mace_tier", services.placements().displayTier(first));
+        ph.put("crystal_tier", services.placements().displayTier(second));
+        ph.put("mode1_tier", services.placements().displayTier(first));
+        ph.put("mode2_tier", services.placements().displayTier(second));
+        ph.put("mode1", mode1);
+        ph.put("mode2", mode2);
         boolean needsProgress = lines.stream().anyMatch(l -> l.contains("%mace_progress%") || l.contains("%crystal_progress%"));
         if (needsProgress) {
-            ph.put("mace_progress", mace.ranked() ? com.meranked.util.TextUtil.stripToLegacy(services.rankProgress().buildBar(mace)) : "");
-            ph.put("crystal_progress", crystal.ranked() ? com.meranked.util.TextUtil.stripToLegacy(services.rankProgress().buildBar(crystal)) : "");
+            ph.put("mace_progress", first.ranked() ? com.meranked.util.TextUtil.stripToLegacy(services.rankProgress().buildBar(first)) : "");
+            ph.put("crystal_progress", second.ranked() ? com.meranked.util.TextUtil.stripToLegacy(services.rankProgress().buildBar(second)) : "");
         }
         ph.put("queue_status", services.queue().isQueued(player.getUniqueId()) ? "In Queue" : "Idle");
         setBoard(player, config.getString("spawn.title", "MERanked"), lines, ph);

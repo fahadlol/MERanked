@@ -1,4 +1,4 @@
-    package com.meranked.rating;
+package com.meranked.rating;
 
 import com.meranked.config.ConfigService;
 import com.meranked.database.DatabaseService;
@@ -7,13 +7,11 @@ import org.bukkit.configuration.file.FileConfiguration;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 
 public final class AntiBoostService {
 
     private final ConfigService configService;
     private final DatabaseService database;
-    private final ConcurrentHashMap<String, Integer> sameIpCache = new ConcurrentHashMap<>();
 
     public AntiBoostService(ConfigService configService, DatabaseService database) {
         this.configService = configService;
@@ -47,13 +45,7 @@ public final class AntiBoostService {
     }
 
     private void upsertOpponent(java.sql.Connection conn, UUID uuid, UUID opponent) throws java.sql.SQLException {
-        try (PreparedStatement ps = conn.prepareStatement("""
-            INSERT INTO ranked_opponent_limits (uuid, opponent_uuid, match_count, last_match)
-            VALUES (?, ?, 1, ?)
-            ON CONFLICT(uuid, opponent_uuid) DO UPDATE SET
-            match_count = CASE WHEN last_match < ? THEN 1 ELSE match_count + 1 END,
-            last_match = ?
-            """)) {
+        try (PreparedStatement ps = conn.prepareStatement(database.dialect().opponentLimitUpsert())) {
             long now = System.currentTimeMillis();
             long dayAgo = now - 86400000L;
             ps.setString(1, uuid.toString());

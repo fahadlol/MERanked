@@ -64,13 +64,7 @@ public final class DetectionService {
 
     private void upsertFarming(java.sql.Connection conn, UUID uuid, UUID opp, String gamemode,
                                long now, long windowMs) throws java.sql.SQLException {
-        try (PreparedStatement ps = conn.prepareStatement("""
-            INSERT INTO ranked_friend_farming (uuid, opponent_uuid, gamemode, match_count, window_start)
-            VALUES (?,?,?,1,?)
-            ON CONFLICT(uuid, opponent_uuid, gamemode) DO UPDATE SET
-                match_count = CASE WHEN window_start < ? THEN 1 ELSE match_count + 1 END,
-                window_start = CASE WHEN window_start < ? THEN ? ELSE window_start END
-            """)) {
+        try (PreparedStatement ps = conn.prepareStatement(services.database().dialect().friendFarmingUpsert())) {
             ps.setString(1, uuid.toString());
             ps.setString(2, opp.toString());
             ps.setString(3, gamemode);
@@ -98,7 +92,6 @@ public final class DetectionService {
         FileConfiguration cfg = services.config().get("queue-ghosting.yml");
         if (!cfg.getBoolean("queue-ghosting.enabled", true)) return;
 
-        // Find another player who was queued in the same gamemode.
         UUID avoided = services.queue().getQueue(gamemode).stream()
                 .map(e -> e.uuid())
                 .filter(u -> !u.equals(leaver))
@@ -111,29 +104,21 @@ public final class DetectionService {
 
         services.database().executeAsync(conn -> {
             int count;
-            try (PreparedStatement ps = conn.prepareStatement("""
-                SELECT id, leave_count, last_event FROM ranked_queue_ghosting
-                WHERE uuid = ? AND avoided_uuid = ?
-                """)) {
+            try (PreparedStatement ps = conn.prepareStatement(services.database().dialect().queueGhostingUpsert())) {
+                ps.setString(1, leaver.toString());
+                ps.setString(2, avoided.toString());
+                ps.setLong(3, now);
+                ps.setLong(4, now - windowMs);
+                ps.setLong(5, now);
+                ps.executeUpdate();
+            }
+            try (PreparedStatement ps = conn.prepareStatement(
+                    "SELECT leave_count FROM ranked_queue_ghosting WHERE uuid = ? AND avoided_uuid = ?")) {
                 ps.setString(1, leaver.toString());
                 ps.setString(2, avoided.toString());
                 try (ResultSet rs = ps.executeQuery()) {
-                    if (rs.next() && now - rs.getLong("last_event") < windowMs) {
-                        count = rs.getInt("leave_count") + 1;
-                    } else {
-                        count = 1;
-                    }
+                    count = rs.next() ? rs.getInt("leave_count") : 1;
                 }
-            }
-            try (PreparedStatement ps = conn.prepareStatement("""
-                INSERT INTO ranked_queue_ghosting (uuid, avoided_uuid, leave_count, last_event)
-                VALUES (?,?,?,?)
-                """)) {
-                ps.setString(1, leaver.toString());
-                ps.setString(2, avoided.toString());
-                ps.setInt(3, count);
-                ps.setLong(4, now);
-                ps.executeUpdate();
             }
             if (count >= threshold) {
                 int fc = count;

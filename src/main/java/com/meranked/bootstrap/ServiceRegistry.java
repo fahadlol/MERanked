@@ -43,7 +43,6 @@ import com.meranked.staff.EvidenceService;
 import com.meranked.staff.PunishmentService;
 import com.meranked.staff.RollbackService;
 import com.meranked.staff.StaffNotesService;
-import com.meranked.staff.StaffService;
 import com.meranked.staff.SuspicionService;
 import com.meranked.staff.WatchlistService;
 import com.meranked.utility.UtilityService;
@@ -104,7 +103,6 @@ public final class ServiceRegistry {
     private SuspicionService suspicionService;
     private WatchlistService watchlistService;
     private RollbackService rollbackService;
-    private StaffService staffService;
     private DetectionService detectionService;
     private BehaviorFingerprintService behaviorFingerprintService;
     private AltLockService altLockService;
@@ -189,13 +187,12 @@ public final class ServiceRegistry {
         discordWebhookService = new DiscordWebhookService(plugin, configService);
         watchlistService = new WatchlistService(plugin, databaseService, alertService);
         rollbackService = new RollbackService(plugin, databaseService, profileService, matchService, alertService);
-        staffService = new StaffService(plugin, alertService, suspicionService, watchlistService, rollbackService);
         detectionService = new DetectionService(plugin, this);
         behaviorFingerprintService = new BehaviorFingerprintService(plugin, this);
         altLockService = new AltLockService(plugin, this);
         staffNotesService = new StaffNotesService(plugin, databaseService);
         punishmentService = new PunishmentService(plugin, this);
-        punishmentService.loadAll();
+        punishmentService.loadAll().join();
         evidenceService = new EvidenceService(plugin, this);
         restartProtectionService = new RestartProtectionService(plugin, this);
         queueService.setLockHolder(restartProtectionService);
@@ -290,7 +287,6 @@ public final class ServiceRegistry {
     public PunishmentService punishments() { return punishmentService; }
     public EvidenceService evidence() { return evidenceService; }
     public RestartProtectionService restartProtection() { return restartProtectionService; }
-    public StaffService staff() { return staffService; }
     public PlayerSettingsService settings() { return settingsService; }
     public WebsiteApiService websiteApi() { return websiteApiService; }
     public RedisLiveCache redisLive() { return redisLiveCache; }

@@ -5,7 +5,7 @@ import org.bukkit.Bukkit;
 import org.bukkit.Location;
 
 import java.io.File;
-import java.lang.reflect.Method;
+import java.io.FileOutputStream;
 
 /** Runtime WorldEdit/FAWE bridge — no compile-time dependency required. */
 final class WorldEditBridge {
@@ -26,6 +26,8 @@ final class WorldEditBridge {
 
     boolean saveSchematic(Location pos1, Location pos2, File output) {
         if (!available) return false;
+        Object session = null;
+        Object writer = null;
         try {
             Class<?> bukkitAdapter = Class.forName("com.sk89q.worldedit.bukkit.BukkitAdapter");
             Class<?> worldEdit = Class.forName("com.sk89q.worldedit.WorldEdit");
@@ -45,49 +47,58 @@ final class WorldEditBridge {
                     .getConstructor(Class.forName("com.sk89q.worldedit.world.World"), bv3, bv3)
                     .newInstance(weWorld, min, max);
 
+            Object dimensions = region.getClass().getMethod("getDimensions").invoke(region);
+
+            Class<?> clipboardClass = Class.forName("com.sk89q.worldedit.extent.clipboard.BlockArrayClipboard");
+            Object clipboard = clipboardClass.getConstructor(bv3).newInstance(dimensions);
+            clipboard.getClass().getMethod("setOrigin", bv3).invoke(clipboard, min);
+
             Object weInstance = worldEdit.getMethod("getInstance").invoke(null);
-            Object session = weInstance.getClass().getMethod("newEditSession", Class.forName("com.sk89q.worldedit.world.World"))
+            session = weInstance.getClass().getMethod("newEditSession", Class.forName("com.sk89q.worldedit.world.World"))
                     .invoke(weInstance, weWorld);
+
+            Object forwardCopy = Class.forName("com.sk89q.worldedit.extent.ForwardExtentCopy")
+                    .getConstructor(Class.forName("com.sk89q.worldedit.extent.Extent"),
+                            Class.forName("com.sk89q.worldedit.regions.Region"),
+                            Class.forName("com.sk89q.worldedit.extent.Extent"), bv3)
+                    .newInstance(weWorld, region, clipboard, min);
+
+            Class.forName("com.sk89q.worldedit.function.operation.Operations")
+                    .getMethod("complete", Class.forName("com.sk89q.worldedit.function.operation.Operation"))
+                    .invoke(null, forwardCopy);
 
             Class<?> clipboardFormats = Class.forName("com.sk89q.worldedit.extent.clipboard.io.ClipboardFormats");
             Object format = clipboardFormats.getMethod("findByAlias", String.class).invoke(null, "schem");
             if (format == null) format = clipboardFormats.getMethod("findByAlias", String.class).invoke(null, "schematic");
+            if (format == null) return false;
 
-            Object forwardExtent = Class.forName("com.sk89q.worldedit.extent.ForwardExtentCopy")
-                    .getConstructor(Class.forName("com.sk89q.worldedit.extent.Extent"), Class.forName("com.sk89q.worldedit.regions.Region"),
-                            Class.forName("com.sk89q.worldedit.extent.Extent"), bv3)
-                    .newInstance(weWorld, region,
-                            Class.forName("com.sk89q.worldedit.extent.clipboard.BlockArrayClipboard")
-                                    .getConstructor(bv3).newInstance(max),
-                            bv3.getMethod("at", int.class, int.class, int.class).invoke(null, 0, 0, 0));
+            writer = format.getClass().getMethod("getWriter", java.io.OutputStream.class)
+                    .invoke(format, new FileOutputStream(output));
+            writer.getClass().getMethod("write", Class.forName("com.sk89q.worldedit.extent.clipboard.Clipboard"))
+                    .invoke(writer, clipboard);
 
-            Class.forName("com.sk89q.worldedit.function.operation.Operations")
-                    .getMethod("complete", Class.forName("com.sk89q.worldedit.function.operation.Operation"))
-                    .invoke(null, forwardExtent);
-
-            Object writer = format.getClass().getMethod("getWriter", java.io.OutputStream.class)
-                    .invoke(format, new java.io.FileOutputStream(output));
-            Method write = writer.getClass().getMethod("write", Class.forName("com.sk89q.worldedit.extent.clipboard.Clipboard"));
-            // Fallback: region save via //schem is complex; snapshot handles failure
-            if (session instanceof AutoCloseable ac) ac.close();
             return output.exists() && output.length() > 0;
         } catch (Exception ex) {
             plugin.getLogger().warning("WE schematic save failed (snapshot fallback available): " + ex.getMessage());
             return false;
+        } finally {
+            closeQuietly(writer);
+            closeQuietly(session);
         }
     }
 
     boolean pasteSchematic(File schematic, Location target) {
         if (!available || !schematic.exists()) return false;
+        Object session = null;
+        Object reader = null;
         try {
             Class<?> formats = Class.forName("com.sk89q.worldedit.extent.clipboard.io.ClipboardFormats");
             Object format = formats.getMethod("findByFile", File.class).invoke(null, schematic);
             if (format == null) return false;
 
-            Object reader = format.getClass().getMethod("getReader", java.io.InputStream.class)
+            reader = format.getClass().getMethod("getReader", java.io.InputStream.class)
                     .invoke(format, new java.io.FileInputStream(schematic));
             Object clipboard = reader.getClass().getMethod("read").invoke(reader);
-            if (reader instanceof AutoCloseable ac) ac.close();
 
             Class<?> bukkitAdapter = Class.forName("com.sk89q.worldedit.bukkit.BukkitAdapter");
             Object weWorld = bukkitAdapter.getMethod("adapt", org.bukkit.World.class).invoke(null, target.getWorld());
@@ -96,7 +107,7 @@ final class WorldEditBridge {
                     target.getBlockX(), target.getBlockY(), target.getBlockZ());
 
             Object we = Class.forName("com.sk89q.worldedit.WorldEdit").getMethod("getInstance").invoke(null);
-            Object session = we.getClass().getMethod("newEditSession", Class.forName("com.sk89q.worldedit.world.World"))
+            session = we.getClass().getMethod("newEditSession", Class.forName("com.sk89q.worldedit.world.World"))
                     .invoke(we, weWorld);
 
             Object holder = Class.forName("com.sk89q.worldedit.session.ClipboardHolder")
@@ -112,11 +123,22 @@ final class WorldEditBridge {
                     .getMethod("complete", Class.forName("com.sk89q.worldedit.function.operation.Operation"))
                     .invoke(null, operation);
             session.getClass().getMethod("flushSession").invoke(session);
-            if (session instanceof AutoCloseable ac) ac.close();
             return true;
         } catch (Exception ex) {
             plugin.getLogger().warning("WE schematic paste failed: " + ex.getMessage());
             return false;
+        } finally {
+            closeQuietly(reader);
+            closeQuietly(session);
+        }
+    }
+
+    private void closeQuietly(Object closeable) {
+        if (closeable instanceof AutoCloseable ac) {
+            try {
+                ac.close();
+            } catch (Exception ignored) {
+            }
         }
     }
 }

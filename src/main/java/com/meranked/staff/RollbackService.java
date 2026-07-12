@@ -61,7 +61,7 @@ public final class RollbackService {
                         newValues.put(uuid + ":" + gamemode, Map.of("rating", ratingBefore, "tier", tierBefore));
                     }
                     logRollback(staff.getUniqueId(), reason, matchId, oldValues, newValues);
-                    alertService.resolveAlert(matchId);
+                    alertService.resolveAlertsForMatch(matchId);
                     return true;
                 }
             }
@@ -162,4 +162,28 @@ public final class RollbackService {
             }
         });
     }
+
+    public java.util.List<RollbackLog> recentLogs(int limit) {
+        return database.queryAsync(conn -> {
+            java.util.List<RollbackLog> logs = new java.util.ArrayList<>();
+            try (PreparedStatement ps = conn.prepareStatement("""
+                SELECT staff_uuid, reason, match_ids, created_at FROM ranked_rollbacks
+                ORDER BY created_at DESC LIMIT ?
+                """)) {
+                ps.setInt(1, limit);
+                try (var rs = ps.executeQuery()) {
+                    while (rs.next()) {
+                        logs.add(new RollbackLog(
+                                UUID.fromString(rs.getString("staff_uuid")),
+                                rs.getString("reason"),
+                                rs.getString("match_ids"),
+                                rs.getLong("created_at")));
+                    }
+                }
+            }
+            return logs;
+        }).join();
+    }
+
+    public record RollbackLog(UUID staffUuid, String reason, String matchId, long createdAt) {}
 }

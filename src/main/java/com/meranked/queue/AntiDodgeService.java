@@ -62,6 +62,7 @@ public final class AntiDodgeService {
         DodgeRecord updated = new DodgeRecord(newCount, cooldown, hiddenUntil, record.hiddenReason(), System.currentTimeMillis());
         cache.put(uuid, updated);
         saveAsync(uuid, updated);
+        plugin.services().suspicion().addFactor(uuid, "dodge", "Queue dodge");
 
         Player player = Bukkit.getPlayer(uuid);
         if (player != null) {
@@ -146,11 +147,11 @@ public final class AntiDodgeService {
 
     private void saveAsync(UUID uuid, DodgeRecord record) {
         database.executeAsync(conn -> {
-            try (PreparedStatement ps = conn.prepareStatement("""
+            try (PreparedStatement ps = conn.prepareStatement(database.sql("""
                 INSERT OR REPLACE INTO ranked_dodges
                 (uuid, dodge_count, cooldown_until, hidden_until, hidden_reason, last_dodge)
                 VALUES (?,?,?,?,?,?)
-                """)) {
+                """))) {
                 ps.setString(1, uuid.toString());
                 ps.setInt(2, record.dodgeCount());
                 ps.setLong(3, record.cooldownUntil());

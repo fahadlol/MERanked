@@ -26,7 +26,8 @@ public final class ReplayService {
         this.plugin = plugin;
         this.configService = configService;
         this.database = database;
-        plugin.tasks().runAsyncTimer(this::flushEvents, 20L, 20L);
+        long intervalTicks = Math.max(1L, configService.get("replays.yml").getLong("batch-interval-ms", 1000L) / 50L);
+        plugin.tasks().runAsyncTimer(this::flushEvents, intervalTicks, intervalTicks);
     }
 
     public void recordEvent(String matchId, String description) {
@@ -37,7 +38,14 @@ public final class ReplayService {
     }
 
     public void recordCombatEvent(RankedMatch match, String type, String description) {
-        recordEvent(match.matchId(), description);
+        FileConfiguration config = configService.get("replays.yml");
+        if (!config.getBoolean("enabled", true)) return;
+        java.util.List<String> allowed = config.getStringList("event-types");
+        if (!allowed.isEmpty() && !allowed.contains(type)) return;
+        int max = config.getInt("max-events-per-match", 500);
+        List<ReplayEvent> events = pendingEvents.computeIfAbsent(match.matchId(), k -> new ArrayList<>());
+        if (events.size() >= max) return;
+        events.add(new ReplayEvent(System.currentTimeMillis(), "[" + type + "] " + description));
     }
 
     public void saveMatch(RankedMatch match) {
@@ -59,9 +67,9 @@ public final class ReplayService {
         data.put("stats", match.allStats());
 
         database.executeAsync(conn -> {
-            try (PreparedStatement ps = conn.prepareStatement("""
+            try (PreparedStatement ps = conn.prepareStatement(database.sql("""
                 INSERT OR REPLACE INTO ranked_replays (match_id, data, created_at) VALUES (?, ?, ?)
-                """)) {
+                """))) {
                 ps.setString(1, match.matchId());
                 ps.setString(2, gson.toJson(data));
                 ps.setLong(3, System.currentTimeMillis());

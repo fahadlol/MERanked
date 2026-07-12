@@ -172,6 +172,32 @@ public final class EvidenceService {
                 + "\nSuspicion: " + bundle.suspicion() + "/100";
     }
 
+    public java.util.List<BundleSummary> recentBundles(int limit) {
+        return services.database().queryAsync(conn -> {
+            java.util.List<BundleSummary> list = new java.util.ArrayList<>();
+            try (PreparedStatement ps = conn.prepareStatement("""
+                SELECT bundle_id, target_type, target_id, reason, suspicion, created_at
+                FROM ranked_evidence_bundles ORDER BY created_at DESC LIMIT ?
+                """)) {
+                ps.setInt(1, limit);
+                try (ResultSet rs = ps.executeQuery()) {
+                    while (rs.next()) {
+                        list.add(new BundleSummary(
+                                rs.getString("bundle_id"),
+                                rs.getString("target_type"),
+                                rs.getString("target_id"),
+                                rs.getString("reason"),
+                                rs.getInt("suspicion"),
+                                rs.getLong("created_at")));
+                    }
+                }
+            }
+            return list;
+        }).join();
+    }
+
+    public record BundleSummary(String bundleId, String targetType, String targetId, String reason, int suspicion, long createdAt) {}
+
     private String nameOf(String uuid) {
         if (uuid == null || uuid.isEmpty()) return "N/A";
         try {

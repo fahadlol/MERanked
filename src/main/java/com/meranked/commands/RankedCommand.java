@@ -188,6 +188,9 @@ public final class RankedCommand implements CommandExecutor, TabCompleter {
                 || args[0].equalsIgnoreCase("leaderboard"))) {
             return filter(services.profiles().enabledGamemodes(), args[1]);
         }
+        if (args.length == 2 && args[0].equalsIgnoreCase("suspicion")) {
+            return filter(Bukkit.getOnlinePlayers().stream().map(Player::getName).toList(), args[1]);
+        }
         if (args.length == 2 && args[0].equalsIgnoreCase("kit")) {
             return filter(List.of("audit", "view", "copy", "reset", "resetall"), args[1]);
         }
