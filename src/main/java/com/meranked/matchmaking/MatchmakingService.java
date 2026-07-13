@@ -83,7 +83,10 @@ public final class MatchmakingService {
                         System.currentTimeMillis() + cooldownMs);
 
                 int range = getRatingRange(entry.queueTimeSeconds());
-                services.matches().createMatch(gamemode, entry.uuid(), opponent.get().entry().uuid(),
+                UUID p1 = entry.uuid();
+                UUID p2 = opponent.get().entry().uuid();
+                services.queueLog().logMatchFound(p1, p2, gamemode, entry.region());
+                services.matches().createMatch(gamemode, p1, p2,
                         range, opponent.get().matchmakingReason());
             }
         }

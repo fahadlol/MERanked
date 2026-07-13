@@ -2,6 +2,7 @@ package com.meranked.listeners;
 
 import com.meranked.MERankedPlugin;
 import com.meranked.bootstrap.ServiceRegistry;
+import com.meranked.core.listeners.DiscordBridgeListener;
 import org.bukkit.event.Listener;
 
 public final class ListenerRegistrar {
@@ -22,6 +23,7 @@ public final class ListenerRegistrar {
         register(new CombatListener(services));
         register(new CommandBlockListener(services));
         register(new ChatListener(services));
+        register(new DiscordBridgeListener(services));
     }
 
     private void register(Listener listener) {

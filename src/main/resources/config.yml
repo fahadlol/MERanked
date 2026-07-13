@@ -63,3 +63,73 @@ rating-spike-detection:
 
 discord-link: "https://discord.gg/meranked"
 rules-link: "https://meranked.gg/rules"
+
+discord-bridge:
+  enabled: true
+  mode: "websocket"
+  websocket-url: "ws://127.0.0.1:8081/minecraft"
+  http-url: "http://127.0.0.1:3000/api/minecraft/event"
+  secret-token: "CHANGE_ME"
+  server-id: "meranked-main"
+  reconnect-delay-seconds: 5
+  heartbeat-seconds: 30
+  queue-offline-events: true
+  max-queued-events: 500
+  inbound-port: 8082
+  inbound-path: "/bridge"
+  debug: false
+
+logs:
+  staff: true
+  queue: true
+  match: true
+  suspicion: true
+  report: true
+  system: true
+  arena: true
+  punishment: true
+  discord: true
+
+staff-duty:
+  enabled: true
+  auto-duty-on-minecraft-join: false
+  require-discord-login-for-ticket-routing: true
+  max-active-tickets-per-staff: 3
+
+reports:
+  enabled: true
+  cooldown-seconds: 120
+  min-reason-length: 5
+  block-self-report: true
+
+performance-logs:
+  enabled: true
+  tps-warning: 17.0
+  memory-warning-percent: 85
+  cooldown-seconds: 300
+
+command-logging:
+  enabled: true
+  staff-commands-only: true
+  ignored-commands:
+    - "msg"
+    - "r"
+    - "tell"
+    - "login"
+    - "register"
+  dangerous-commands:
+    - "ban"
+    - "mute"
+    - "kick"
+    - "warn"
+    - "unban"
+    - "unmute"
+    - "op"
+    - "deop"
+    - "lp"
+    - "luckperms"
+    - "gamemode"
+    - "tp"
+    - "teleport"
+    - "vanish"
+    - "freeze"

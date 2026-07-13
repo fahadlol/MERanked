@@ -1,6 +1,15 @@
 package com.meranked.commands;
 
 import com.meranked.MERankedPlugin;
+import com.meranked.commands.*;
+import com.meranked.core.commands.BridgeCommand;
+import com.meranked.core.commands.LookupCommand;
+import com.meranked.core.commands.StaffNoteCommand;
+import com.meranked.core.reports.ReportCommand;
+import com.meranked.core.reports.ReportsReviewCommand;
+import com.meranked.core.staff.StaffDutyCommand;
+import com.meranked.core.staff.StaffPanelCommand;
+import com.meranked.core.staff.StaffStatusCommand;
 import com.meranked.bootstrap.ServiceRegistry;
 import com.meranked.util.TextUtil;
 import org.bukkit.command.Command;
@@ -55,6 +64,18 @@ public final class CommandRegistrar {
         register("punish", new PunishCommand(services));
         register("history", new HistoryCommand(services));
         register("unpunish", new UnpunishCommand(services));
+        register("bridge", new BridgeCommand(services));
+        register("staffduty", new StaffDutyCommand(services));
+        register("staffstatus", new StaffStatusCommand(services));
+        register("staffpanel", new StaffPanelCommand(services));
+        register("report", new ReportCommand(services));
+        ReportsReviewCommand reportsReview = new ReportsReviewCommand(services);
+        register("reports", reportsReview);
+        register("reportreview", reportsReview);
+        register("reportvalid", reportsReview);
+        register("reportinvalid", reportsReview);
+        register("lookup", new LookupCommand(services));
+        register("staffnote", new StaffNoteCommand(services));
     }
 
     private void register(String name, CommandExecutor executor) {

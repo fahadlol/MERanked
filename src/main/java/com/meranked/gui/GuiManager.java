@@ -438,6 +438,27 @@ public final class GuiManager {
         staff.openInventory(inv);
     }
 
+    public void openStaffPanel(Player staff) {
+        Inventory inv = Bukkit.createInventory(null, 54, TextUtil.parse("<gradient:#D6B36A:#7C3AED><bold>Staff Panel</bold></gradient>"));
+        boolean connected = services.discordBridge().isConnected();
+        inv.setItem(4, item(Material.REPEATER, connected ? "<green>Bridge Connected</green>" : "<red>Bridge Offline</red>",
+                "Queued: " + services.discordBridge().queueSize()));
+        inv.setItem(10, item(Material.COMPASS, "<gold>Staff On Duty</gold>",
+                services.staffDuty().onDutyCount() + " on duty"));
+        inv.setItem(12, item(Material.PAPER, "<gold>Active Reports</gold>",
+                services.reports().openReports().size() + " open"));
+        inv.setItem(14, item(Material.IRON_BARS, "<gold>Recent Punishments</gold>", "Use /history"));
+        inv.setItem(16, item(Material.REDSTONE, "<gold>Suspicion Alerts</gold>",
+                services.alerts().recentAlerts().size() + " recent"));
+        inv.setItem(28, item(Material.IRON_SWORD, "<gold>Match Alerts</gold>",
+                services.matches().liveMatches().size() + " live"));
+        inv.setItem(30, item(Material.BARRIER, "<gold>Arena Issues</gold>", "Broken/disabled arenas"));
+        inv.setItem(32, item(Material.WRITABLE_BOOK, "<gold>Staff Notes</gold>", "Use /staffnote"));
+        inv.setItem(49, item(Material.RED_CONCRETE, "<red>Close</red>", "Close panel"));
+        setSession(staff, GuiSession.of(GuiType.STAFF_PANEL));
+        staff.openInventory(inv);
+    }
+
     // ---- Rollback Preview ----
 
     public void openRollbackPreview(Player staff, String matchId) {

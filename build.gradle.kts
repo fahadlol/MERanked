@@ -1,4 +1,4 @@
-plugins {
+ plugins {
     java
     id("io.papermc.paperweight.userdev") version "1.7.7" apply false
 }
@@ -46,7 +46,9 @@ tasks {
 
     jar {
         archiveClassifier.set("")
-        from(configurations.runtimeClasspath.get().map { if (it.isDirectory) it else zipTree(it) })
+        from(configurations.runtimeClasspath.get().map { if (it.isDirectory) it else zipTree(it) }) {
+            exclude("META-INF/*.SF", "META-INF/*.DSA", "META-INF/*.RSA")
+        }
         duplicatesStrategy = DuplicatesStrategy.EXCLUDE
     }
 }

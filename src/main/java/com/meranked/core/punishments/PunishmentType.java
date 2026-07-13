@@ -1,0 +1,6 @@
+package com.meranked.core.punishments;
+
+public enum PunishmentType {
+    BAN, MUTE, KICK, WARN, BLACKLIST, UNBAN, UNMUTE, UNBLACKLIST,
+    PUNISHMENT_REDUCED, PUNISHMENT_EXPIRED, APPEAL_ACCEPTED, APPEAL_DENIED
+}

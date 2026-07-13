@@ -43,6 +43,7 @@ public final class GuiListener implements Listener {
             case TRIM_EDITOR -> handleTrimEditor(player, session, event.getRawSlot());
             case REPLAY -> handleReplay(player, session, event.getRawSlot());
             case STAFF_CENTER -> handleStaffCenter(player, event.getRawSlot());
+            case STAFF_PANEL -> { if (event.getRawSlot() == 49) player.closeInventory(); }
             case ROLLBACK_PREVIEW -> handleRollbackPreview(player, session, event.getRawSlot());
             case PUNISH_TYPE -> handlePunishType(player, session, event.getRawSlot());
             case PUNISH_REASON -> handlePunishReason(player, session, event.getRawSlot());

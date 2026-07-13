@@ -103,6 +103,7 @@ public final class MatchService {
         match.setArenaName(arena.name());
         match.setCloneIndex(clone.get());
         arena.incrementUsage();
+        services.arenaLog().logArenaSelected(arena.name(), match.matchId(), match.gamemode());
 
         services.arenas().regenerateArenaAsync(arena, clone.get(), () -> {
             services.cinematic().playIntro(match, services.profiles(), services.placements(), () -> {
@@ -163,6 +164,7 @@ public final class MatchService {
         if (remaining <= 0) {
             match.setState(RankedMatch.State.ACTIVE);
             match.setHasStarted(true);
+            services.matchLog().logMatchStart(match, match.arenaName());
             for (UUID uuid : List.of(match.player1(), match.player2())) {
                 Player player = Bukkit.getPlayer(uuid);
                 if (player != null) {
@@ -324,7 +326,19 @@ public final class MatchService {
         saveParticipantsAsync(match);
         cleanupMatch(match);
 
+        java.util.Map<UUID, Double> ratingChanges = new java.util.HashMap<>();
+        if (!match.noRatingChange()) {
+            for (UUID id : List.of(winner, loser)) {
+                double before = match.ratingBefore().getOrDefault(id, 0.0);
+                double after = match.ratingAfter().getOrDefault(id, before);
+                ratingChanges.put(id, after - before);
+            }
+        }
+        services.matchLog().logMatchEnd(match, winner, loser,
+                match.bestOfThree() ? match.roundWins(winner) + "-" + match.roundWins(loser) : "1-0",
+                match.durationMillis(), ratingChanges);
         if (disconnect) {
+            services.matchLog().logMatchDisconnect(match.matchId(), loser, "disconnect");
             if (lPlayer != null) services.messages().send(lPlayer, "match.disconnect-loss");
         }
     }
@@ -662,6 +676,7 @@ public final class MatchService {
         }
         services.arenaVoting().endVoting(match);
         activeMatches.remove(match.matchId());
+        services.matchLog().logMatchCancel(match.matchId(), reason);
     }
 
     private void saveMatchAsync(RankedMatch match) {

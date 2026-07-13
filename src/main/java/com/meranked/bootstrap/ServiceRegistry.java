@@ -48,6 +48,15 @@ import com.meranked.staff.SuspicionService;
 import com.meranked.staff.WatchlistService;
 import com.meranked.utility.UtilityService;
 import com.meranked.voting.ArenaVoteService;
+import com.meranked.core.discord.DiscordBridgeManager;
+import com.meranked.core.logs.ArenaLogService;
+import com.meranked.core.logs.MatchLogService;
+import com.meranked.core.logs.MerankedLoggerService;
+import com.meranked.core.logs.QueueLogService;
+import com.meranked.core.logs.SuspicionLogService;
+import com.meranked.core.punishments.PunishmentLogService;
+import com.meranked.core.reports.ReportService;
+import com.meranked.core.staff.StaffDutyService;
 
 import java.util.concurrent.CompletableFuture;
 
@@ -120,6 +129,16 @@ public final class ServiceRegistry {
     private PlaceholderBridge placeholderBridge;
     private GuiManager guiManager;
 
+    private MerankedLoggerService loggerService;
+    private DiscordBridgeManager discordBridgeManager;
+    private StaffDutyService staffDutyService;
+    private ReportService reportService;
+    private PunishmentLogService punishmentLogService;
+    private QueueLogService queueLogService;
+    private MatchLogService matchLogService;
+    private ArenaLogService arenaLogService;
+    private SuspicionLogService suspicionLogService;
+
     public ServiceRegistry(MERankedPlugin plugin) {
         this.plugin = plugin;
     }
@@ -140,6 +159,18 @@ public final class ServiceRegistry {
     }
 
     public void registerModules() {
+        String serverId = configService.get("config.yml").getString("discord-bridge.server-id", "meranked-main");
+        loggerService = new MerankedLoggerService(plugin, configService);
+        discordBridgeManager = new DiscordBridgeManager(plugin, this, loggerService);
+        loggerService.bindBridge(discordBridgeManager);
+        staffDutyService = new StaffDutyService(plugin, configService, loggerService);
+        reportService = new ReportService(plugin, this, loggerService, configService);
+        punishmentLogService = new PunishmentLogService(this, loggerService);
+        queueLogService = new QueueLogService(this, loggerService);
+        matchLogService = new MatchLogService(this, loggerService);
+        arenaLogService = new ArenaLogService(loggerService, serverId);
+        suspicionLogService = new SuspicionLogService(loggerService, serverId);
+
         tierService = new TierService(configService);
         ratingService = new RatingService(configService, tierService);
         seasonService = new SeasonService(plugin, configService, databaseService);
@@ -217,6 +248,10 @@ public final class ServiceRegistry {
         profileService.startCacheFlushTask();
         plugin.tasks().runAsyncTimer(this::publishLiveData, 40L, 40L);
 
+        discordBridgeManager.start();
+        loggerService.log(com.meranked.core.logs.LogCategory.SYSTEM, "PLUGIN_ENABLED", com.meranked.core.logs.LogSeverity.INFO,
+                "MERanked plugin enabled");
+
         plugin.getLogger().info("All MERanked modules registered.");
     }
 
@@ -229,6 +264,11 @@ public final class ServiceRegistry {
     }
 
     public void shutdown() {
+        if (loggerService != null) {
+            loggerService.log(com.meranked.core.logs.LogCategory.SYSTEM, "PLUGIN_DISABLED", com.meranked.core.logs.LogSeverity.INFO,
+                    "MERanked plugin disabled");
+        }
+        if (discordBridgeManager != null) discordBridgeManager.shutdown();
         if (matchmakingService != null) matchmakingService.stop();
         if (scoreboardService != null) scoreboardService.stop();
         if (websiteApiService != null) websiteApiService.stop();
@@ -297,4 +337,13 @@ public final class ServiceRegistry {
     public UtilityService utility() { return utilityService; }
     public PlaceholderBridge placeholders() { return placeholderBridge; }
     public GuiManager gui() { return guiManager; }
+    public MerankedLoggerService logger() { return loggerService; }
+    public DiscordBridgeManager discordBridge() { return discordBridgeManager; }
+    public StaffDutyService staffDuty() { return staffDutyService; }
+    public ReportService reports() { return reportService; }
+    public PunishmentLogService punishmentLog() { return punishmentLogService; }
+    public QueueLogService queueLog() { return queueLogService; }
+    public MatchLogService matchLog() { return matchLogService; }
+    public ArenaLogService arenaLog() { return arenaLogService; }
+    public SuspicionLogService suspicionLog() { return suspicionLogService; }
 }

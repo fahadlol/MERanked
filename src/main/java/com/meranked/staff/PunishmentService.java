@@ -80,6 +80,7 @@ public final class PunishmentService {
 
         applyEffects(target, punishment);
         sendWebhook(punishment);
+        services.punishmentLog().logCreated(punishment);
         return punishment;
     }
 
@@ -147,6 +148,9 @@ public final class PunishmentService {
                     if (list.isEmpty()) cache.remove(target);
                 }
                 logHistory(conn, punishmentId, target, "REVOKED", staff);
+                if (target != null) {
+                    services.punishmentLog().logRemoved(punishmentId, target, staff, "Revoked by staff");
+                }
             }
         });
     }

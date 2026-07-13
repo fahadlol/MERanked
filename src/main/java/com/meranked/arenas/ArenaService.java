@@ -155,6 +155,7 @@ public final class ArenaService {
         arena.setBroken(true);
         arena.setBrokenReason(reason);
         saveArenaAsync(arena);
+        plugin.services().arenaLog().logArenaDisabled(arena.name(), reason);
         for (Player staff : Bukkit.getOnlinePlayers()) {
             if (staff.hasPermission("meranked.staff")) {
                 messages.sendPrefixed(staff, "arena.auto-disabled", Map.of("arena", arena.name(), "reason", reason));

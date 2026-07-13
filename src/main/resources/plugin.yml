@@ -79,6 +79,40 @@ commands:
   unpunish:
     description: Revoke a punishment
     permission: meranked.unpunish
+  bridge:
+    description: Discord bridge management
+    permission: meranked.bridge.status
+  staffduty:
+    description: Toggle staff duty
+    aliases: [duty, stafflogin]
+    permission: meranked.staff.duty
+  staffstatus:
+    description: Staff and bridge status
+    permission: meranked.staff.status
+  staffpanel:
+    description: Open staff panel GUI
+    permission: meranked.staff.panel
+  report:
+    description: Report a player
+    permission: meranked.report.use
+  reports:
+    description: List open reports
+    permission: meranked.report.review
+  reportreview:
+    description: Review a report
+    permission: meranked.report.review
+  reportvalid:
+    description: Mark report valid
+    permission: meranked.report.review
+  reportinvalid:
+    description: Mark report invalid
+    permission: meranked.report.review
+  lookup:
+    description: Staff player lookup
+    permission: meranked.staff.lookup
+  staffnote:
+    description: Add staff note
+    permission: meranked.staff.note
 permissions:
   meranked.*:
     description: All MERanked permissions
@@ -143,4 +177,46 @@ permissions:
     default: op
   meranked.history:
     description: View punishment history
+    default: op
+  meranked.bridge.status:
+    description: View bridge status
+    default: op
+  meranked.bridge.reload:
+    description: Reload bridge config
+    default: op
+  meranked.bridge.test:
+    description: Send test bridge log
+    default: op
+  meranked.staff.duty:
+    description: Toggle staff duty
+    default: op
+  meranked.staff.status:
+    description: View staff status
+    default: op
+  meranked.staff.panel:
+    description: Open staff panel
+    default: op
+  meranked.staff.lookup:
+    description: Player lookup
+    default: op
+  meranked.staff.note:
+    description: Add staff notes
+    default: op
+  meranked.report.use:
+    description: Submit reports
+    default: true
+  meranked.report.review:
+    description: Review reports
+    default: op
+  meranked.punish.blacklist:
+    description: Issue blacklists
+    default: op
+  meranked.punish.remove:
+    description: Remove punishments
+    default: op
+  meranked.punish.history:
+    description: View punishment history
+    default: op
+  meranked.punish.exempt:
+    description: Exempt from punishments
     default: op

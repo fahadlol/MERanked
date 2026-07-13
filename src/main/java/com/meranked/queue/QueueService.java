@@ -127,6 +127,7 @@ public final class QueueService {
 
         queues.computeIfAbsent(gamemode, g -> new ArrayList<>()).add(entry);
         messages.sendPrefixed(player, "queue.joined", Map.of("gamemode", gamemode));
+        plugin.services().queueLog().logQueueJoin(player, gamemode, region, (int) profile.rating());
         return true;
     }
 
@@ -136,7 +137,10 @@ public final class QueueService {
             list.removeIf(e -> e.uuid().equals(uuid));
         }
         Player player = Bukkit.getPlayer(uuid);
-        if (player != null) messages.send(player, "queue.left");
+        if (player != null) {
+            messages.send(player, "queue.left");
+            plugin.services().queueLog().logQueueLeave(player, gamemode != null ? "left" : "unknown");
+        }
         if (gamemode != null) {
             plugin.services().detection().recordQueueLeave(uuid, gamemode);
         }

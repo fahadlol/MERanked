@@ -30,29 +30,47 @@ public final class DatabaseService {
 
     public CompletableFuture<Void> initialize() {
         return CompletableFuture.runAsync(() -> {
-            FileConfiguration dbConfig = configService.get("database.yml");
-            databaseType = dbConfig.getString("type", "SQLITE").toUpperCase();
-            HikariConfig config = new HikariConfig();
-            config.setPoolName("MERanked-Pool");
-            config.setMaximumPoolSize(dbConfig.getInt("mysql.pool-size", 10));
+            try {
+                FileConfiguration dbConfig = configService.get("database.yml");
+                databaseType = dbConfig.getString("type", "SQLITE").toUpperCase();
+                HikariConfig config = new HikariConfig();
+                config.setPoolName("MERanked-Pool");
 
-            if ("MYSQL".equals(databaseType)) {
-                String host = dbConfig.getString("mysql.host", "localhost");
-                int port = dbConfig.getInt("mysql.port", 3306);
-                String database = dbConfig.getString("mysql.database", "meranked");
-                config.setJdbcUrl("jdbc:mysql://" + host + ":" + port + "/" + database + "?useSSL="
-                        + dbConfig.getBoolean("mysql.use-ssl", false));
-                config.setUsername(dbConfig.getString("mysql.username", "root"));
-                config.setPassword(dbConfig.getString("mysql.password", ""));
-            } else {
-                File dbFile = new File(configService.getDataFolder(), dbConfig.getString("sqlite.file", "meranked.db"));
-                config.setJdbcUrl("jdbc:sqlite:" + dbFile.getAbsolutePath());
+                if ("MYSQL".equals(databaseType)) {
+                    config.setMaximumPoolSize(dbConfig.getInt("mysql.pool-size", 10));
+                    config.setDriverClassName("com.mysql.cj.jdbc.Driver");
+                    String host = dbConfig.getString("mysql.host", "localhost");
+                    int port = dbConfig.getInt("mysql.port", 3306);
+                    String database = dbConfig.getString("mysql.database", "meranked");
+                    config.setJdbcUrl("jdbc:mysql://" + host + ":" + port + "/" + database + "?useSSL="
+                            + dbConfig.getBoolean("mysql.use-ssl", false));
+                    config.setUsername(dbConfig.getString("mysql.username", "root"));
+                    config.setPassword(dbConfig.getString("mysql.password", ""));
+                } else {
+                    databaseType = "SQLITE";
+                    config.setMaximumPoolSize(1);
+                    config.setDriverClassName("org.sqlite.JDBC");
+                    File dataFolder = configService.getDataFolder();
+                    if (!dataFolder.exists() && !dataFolder.mkdirs()) {
+                        throw new SQLException("Failed to create plugin data folder: " + dataFolder.getAbsolutePath());
+                    }
+                    File dbFile = new File(dataFolder, dbConfig.getString("sqlite.file", "meranked.db"));
+                    File parent = dbFile.getParentFile();
+                    if (parent != null && !parent.exists() && !parent.mkdirs()) {
+                        throw new SQLException("Failed to create database directory: " + parent.getAbsolutePath());
+                    }
+                    config.setJdbcUrl("jdbc:sqlite:" + dbFile.getAbsolutePath());
+                }
+
+                dataSource = new HikariDataSource(config);
+                executor = Executors.newFixedThreadPool(Math.max(2, Runtime.getRuntime().availableProcessors() / 2));
+                createTables();
+                plugin.getLogger().info("Database initialized (" + databaseType + ").");
+            } catch (Exception ex) {
+                shutdown();
+                throw new java.util.concurrent.CompletionException(
+                        "Database initialization failed: " + ex.getMessage(), ex);
             }
-
-            dataSource = new HikariDataSource(config);
-            executor = Executors.newFixedThreadPool(Math.max(2, Runtime.getRuntime().availableProcessors() / 2));
-            createTables();
-            plugin.getLogger().info("Database initialized (" + databaseType + ").");
         });
     }
 
@@ -402,6 +420,21 @@ public final class DatabaseService {
                         samples INT DEFAULT 0,
                         updated_at BIGINT,
                         PRIMARY KEY (uuid, gamemode)
+                    )
+                    """);
+                stmt.execute("""
+                    CREATE TABLE IF NOT EXISTS ranked_reports (
+                        report_id VARCHAR(24) PRIMARY KEY,
+                        reporter_uuid VARCHAR(36),
+                        reporter_name VARCHAR(32),
+                        reported_uuid VARCHAR(36),
+                        reported_name VARCHAR(32),
+                        reason TEXT,
+                        status VARCHAR(16) DEFAULT 'OPEN',
+                        created_at BIGINT,
+                        reviewed_by VARCHAR(36),
+                        reviewed_at BIGINT,
+                        review_notes TEXT
                     )
                     """);
                 migrateColumns(stmt);

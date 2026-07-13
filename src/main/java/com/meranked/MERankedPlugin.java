@@ -33,8 +33,9 @@ public final class MERankedPlugin extends JavaPlugin {
             }
             getLogger().info("MERanked enabled — Gold Rift theme active.");
         })).exceptionally(ex -> {
-            getLogger().severe("Failed to initialize MERanked: " + ex.getMessage());
-            ex.printStackTrace();
+            Throwable cause = ex.getCause() != null ? ex.getCause() : ex;
+            getLogger().severe("Failed to initialize MERanked: " + cause.getMessage());
+            cause.printStackTrace();
             getServer().getPluginManager().disablePlugin(this);
             return null;
         });

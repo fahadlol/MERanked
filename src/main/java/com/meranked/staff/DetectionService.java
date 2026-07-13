@@ -86,6 +86,7 @@ public final class DetectionService {
         AlertSeverity severity = severity(cfg.getString("friend-farming.alert-severity", "HIGH"));
         String reason = total + " ranked matches across " + modes + " gamemodes in 24h.";
         services.alerts().createAlert("FRIEND_FARMING", severity, reason, null, java.util.List.of(a, b));
+        services.suspicionLog().logFriendFarming(a, b, total, modes);
         int inc = cfg.getInt("friend-farming.suspicion-increase", 15);
         services.suspicion().addScore(a, inc, "Friend farming");
         services.suspicion().addScore(b, inc, "Friend farming");
