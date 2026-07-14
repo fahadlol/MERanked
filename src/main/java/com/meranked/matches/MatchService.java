@@ -659,6 +659,7 @@ public final class MatchService {
                 else services.utility().teleportSpawn(player);
                 player.setGameMode(GameMode.SURVIVAL);
                 PlayerFreezeUtil.setFrozen(player, false);
+                services.lobbyItems().giveLobbyItems(player);
             }
         }
         activeMatches.remove(match.matchId());
@@ -672,6 +673,7 @@ public final class MatchService {
                 PlayerFreezeUtil.setFrozen(player, false);
                 player.closeInventory();
                 services.utility().teleportSpawn(player);
+                services.lobbyItems().giveLobbyItems(player);
             }
         }
         services.arenaVoting().endVoting(match);

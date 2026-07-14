@@ -2,6 +2,7 @@ package com.meranked.gui;
 
 public enum GuiType {
     RANKED_MENU,
+    KIT_EDITOR_MENU,
     PROFILE,
     PLACEMENT_RECAP,
     SETTINGS,

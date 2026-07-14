@@ -80,6 +80,7 @@ public final class RankedCommand implements CommandExecutor, TabCompleter {
                 }
                 services.config().reloadAll();
                 services.messages().reload();
+                services.lobbyItems().reloadDefinitions();
                 services.messages().send(sender, "general.reload-success");
             }
             case "alerts" -> {

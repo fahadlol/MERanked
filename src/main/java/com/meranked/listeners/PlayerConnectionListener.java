@@ -17,7 +17,7 @@ public final class PlayerConnectionListener implements Listener {
     @EventHandler
     public void onJoin(PlayerJoinEvent event) {
         services.profiles().preloadAsync(event.getPlayer().getUniqueId(), event.getPlayer().getName());
-        event.getPlayer().getInventory().setItem(8, services.kitEditor().createEditorItem());
+        services.lobbyItems().giveLobbyItems(event.getPlayer());
     }
 
     @EventHandler

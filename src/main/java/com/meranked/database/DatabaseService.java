@@ -65,7 +65,13 @@ public final class DatabaseService {
                 dataSource = new HikariDataSource(config);
                 executor = Executors.newFixedThreadPool(Math.max(2, Runtime.getRuntime().availableProcessors() / 2));
                 createTables();
-                plugin.getLogger().info("Database initialized (" + databaseType + ").");
+                if ("SQLITE".equals(databaseType)) {
+                    File dbFile = new File(configService.getDataFolder(),
+                            dbConfig.getString("sqlite.file", "meranked.db"));
+                    plugin.getLogger().info("Database initialized (SQLITE: " + dbFile.getName() + ").");
+                } else {
+                    plugin.getLogger().info("Database initialized (MYSQL).");
+                }
             } catch (Exception ex) {
                 shutdown();
                 throw new java.util.concurrent.CompletionException(
