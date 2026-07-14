@@ -249,6 +249,7 @@ public final class DatabaseService {
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
                         match_id VARCHAR(16),
                         timestamp_ms BIGINT,
+                        event_type VARCHAR(32) DEFAULT 'UNKNOWN',
                         description TEXT
                     )
                     """);
@@ -451,6 +452,7 @@ public final class DatabaseService {
     private void migrateColumns(Statement stmt) {
         try { stmt.execute("ALTER TABLE ranked_profiles ADD COLUMN hidden_mmr DOUBLE DEFAULT 1500"); } catch (SQLException ignored) {}
         try { stmt.execute("ALTER TABLE ranked_match_quality ADD COLUMN matchmaking_reason TEXT"); } catch (SQLException ignored) {}
+        try { stmt.execute("ALTER TABLE ranked_replay_events ADD COLUMN event_type VARCHAR(32) DEFAULT 'UNKNOWN'"); } catch (SQLException ignored) {}
     }
 
     public Connection getConnection() throws SQLException {
