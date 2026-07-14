@@ -22,12 +22,12 @@ public final class PlayerConnectionListener implements Listener {
         services.profiles().preloadAsync(uuid, event.getPlayer().getName());
         services.antiDodge().preloadAsync(uuid);
         services.settings().loadAsync(uuid);
-        event.getPlayer().getInventory().setItem(8, services.kitEditor().createEditorItem());
+        services.lobbyItems().giveLobbyItems(event.getPlayer());
     }
 
     @EventHandler
     public void onQuit(PlayerQuitEvent event) {
-        java.util.UUID uuid = event.getPlayer().getUniqueId();
+        UUID uuid = event.getPlayer().getUniqueId();
         if (services.kitEditor().isEditing(uuid)) {
             services.kitEditor().leaveEditor(event.getPlayer());
         }

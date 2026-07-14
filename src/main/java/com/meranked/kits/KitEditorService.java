@@ -221,18 +221,7 @@ public final class KitEditorService {
     }
 
     public ItemStack createEditorItem() {
-        FileConfiguration config = configService.get("kit-editor.yml");
-        Material mat = Material.valueOf(config.getString("editor-item.material", "NETHER_STAR"));
-        ItemStack item = new ItemStack(mat);
-        ItemMeta meta = item.getItemMeta();
-        meta.displayName(TextUtil.parse(config.getString("editor-item.name", "<gold>Kit Editor</gold>")));
-        List<net.kyori.adventure.text.Component> lore = new ArrayList<>();
-        for (String line : config.getStringList("editor-item.lore")) {
-            lore.add(TextUtil.parse(line));
-        }
-        meta.lore(lore);
-        item.setItemMeta(meta);
-        return item;
+        return plugin.services().lobbyItems().createItem(com.meranked.lobby.LobbyItemType.KIT_EDITOR);
     }
 
     private record EditorSession(String gamemode, org.bukkit.Location returnLocation,

@@ -12,6 +12,7 @@ import com.meranked.database.DatabaseService;
 import com.meranked.database.RedisService;
 import com.meranked.gui.GuiListener;
 import com.meranked.gui.GuiManager;
+import com.meranked.lobby.LobbyItemService;
 import com.meranked.kits.DefaultKitService;
 import com.meranked.kits.KitChecksumService;
 import com.meranked.kits.KitEditorService;
@@ -128,6 +129,7 @@ public final class ServiceRegistry {
     private UtilityService utilityService;
     private PlaceholderBridge placeholderBridge;
     private GuiManager guiManager;
+    private LobbyItemService lobbyItemService;
 
     private MerankedLoggerService loggerService;
     private DiscordBridgeManager discordBridgeManager;
@@ -159,7 +161,11 @@ public final class ServiceRegistry {
     }
 
     public void registerModules() {
+        var logger = plugin.getLogger();
+        logger.info("Registering MERanked modules...");
+
         String serverId = configService.get("config.yml").getString("discord-bridge.server-id", "meranked-main");
+        logger.info("  [core] Logging & Discord bridge");
         loggerService = new MerankedLoggerService(plugin, configService);
         discordBridgeManager = new DiscordBridgeManager(plugin, this, loggerService);
         loggerService.bindBridge(discordBridgeManager);
@@ -171,6 +177,7 @@ public final class ServiceRegistry {
         arenaLogService = new ArenaLogService(loggerService, serverId);
         suspicionLogService = new SuspicionLogService(loggerService, serverId);
 
+        logger.info("  [rating] Tiers, profiles, seasons, leaderboards");
         tierService = new TierService(configService);
         ratingService = new RatingService(configService, tierService);
         seasonService = new SeasonService(plugin, configService, databaseService);
@@ -186,6 +193,7 @@ public final class ServiceRegistry {
         rankProgressService = new RankProgressService(configService, tierService);
         upsetService = new UpsetService(plugin, configService, databaseService);
 
+        logger.info("  [queue] Queue, matchmaking, anti-dodge");
         settingsService = new PlayerSettingsService(plugin, configService, databaseService);
         banService = new BanService(plugin, databaseService);
         antiDodgeService = new AntiDodgeService(plugin, configService, databaseService, messageService);
@@ -202,6 +210,7 @@ public final class ServiceRegistry {
         matchService = new MatchService(plugin, this);
         matchmakingService.bindServices(this);
 
+        logger.info("  [match] Arenas, voting, matches, cinematics");
         kitService = new KitService(plugin, configService, databaseService);
         kitChecksumService = new KitChecksumService(plugin, this);
         kitService.bindChecksum(kitChecksumService);
@@ -209,11 +218,13 @@ public final class ServiceRegistry {
         defaultKitService = new DefaultKitService(plugin, configService, kitService);
         kitEditorService = new KitEditorService(plugin, configService, kitService, messageService);
 
+        logger.info("  [kits] Kit storage, validation, editor");
         replayService = new ReplayService(plugin, configService, databaseService);
         spectateService = new SpectateService(plugin, configService, matchService, messageService);
         spectateRequestService = new SpectateRequestService(plugin, matchService, spectateService, settingsService, messageService);
         scoreboardService = new ScoreboardService(plugin, configService, this);
 
+        logger.info("  [staff] Alerts, suspicion, punishments, evidence");
         regionService = new RegionService(plugin, configService, databaseService, messageService, profileService);
         suspicionService = new SuspicionService(plugin, configService, databaseService);
         alertService = new AlertService(plugin, configService, databaseService, messageService, suspicionService);
@@ -231,10 +242,12 @@ public final class ServiceRegistry {
         restartProtectionService = new RestartProtectionService(plugin, this);
         queueService.setLockHolder(restartProtectionService);
 
+        logger.info("  [utility] Redis cache, website API, lobby items, GUIs");
         redisLiveCache = new RedisLiveCache(plugin, redisService);
         websiteApiService = new WebsiteApiService(plugin, configService, this);
         utilityService = new UtilityService(plugin, configService, messageService, matchService, settingsService);
         guiManager = new GuiManager(plugin, this);
+        lobbyItemService = new LobbyItemService(plugin, configService);
         placeholderBridge = new PlaceholderBridge(this);
 
         plugin.getServer().getPluginManager().registerEvents(new GuiListener(this), plugin);
@@ -253,6 +266,12 @@ public final class ServiceRegistry {
                 "MERanked plugin enabled");
 
         plugin.getLogger().info("All MERanked modules registered.");
+        logger.info("  Gamemodes: " + String.join(", ", profileService.enabledGamemodes()));
+        if (lobbyItemService.enabled()) {
+            logger.info("  Lobby items: " + String.join(", ", lobbyItemService.enabledItemNames()));
+        } else {
+            logger.info("  Lobby items: disabled");
+        }
     }
 
     private void publishLiveData() {
@@ -337,6 +356,7 @@ public final class ServiceRegistry {
     public UtilityService utility() { return utilityService; }
     public PlaceholderBridge placeholders() { return placeholderBridge; }
     public GuiManager gui() { return guiManager; }
+    public LobbyItemService lobbyItems() { return lobbyItemService; }
     public MerankedLoggerService logger() { return loggerService; }
     public DiscordBridgeManager discordBridge() { return discordBridgeManager; }
     public StaffDutyService staffDuty() { return staffDutyService; }

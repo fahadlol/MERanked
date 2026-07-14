@@ -89,7 +89,13 @@ public final class DatabaseService {
                     return t;
                 });
                 createTables();
-                plugin.getLogger().info("Database initialized (" + databaseType + ").");
+                if ("SQLITE".equals(databaseType)) {
+                    File dbFile = new File(configService.getDataFolder(),
+                            dbConfig.getString("sqlite.file", "meranked.db"));
+                    plugin.getLogger().info("Database initialized (SQLITE: " + dbFile.getName() + ").");
+                } else {
+                    plugin.getLogger().info("Database initialized (MYSQL).");
+                }
             } catch (Exception ex) {
                 shutdown();
                 throw new java.util.concurrent.CompletionException(
