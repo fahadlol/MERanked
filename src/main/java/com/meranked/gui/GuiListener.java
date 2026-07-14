@@ -43,8 +43,15 @@ public final class GuiListener implements Listener {
             case KIT_AUDIT -> handleKitAudit(player, session, event.getRawSlot());
             case TRIM_EDITOR -> handleTrimEditor(player, session, event.getRawSlot());
             case REPLAY -> handleReplay(player, session, event.getRawSlot());
+            case VISUAL_REPLAY -> handleVisualReplay(player, session, event.getRawSlot());
             case STAFF_CENTER -> handleStaffCenter(player, event.getRawSlot());
-            case STAFF_PANEL -> { if (event.getRawSlot() == 49) player.closeInventory(); }
+            case STAFF_PANEL -> handleStaffPanel(player, event.getRawSlot());
+            case BROKEN_ARENAS -> { if (event.getRawSlot() == 49) services.gui().openStaffCenter(player); }
+            case KIT_AUDIT_PLAYER -> handleKitAuditPlayer(player, event.getRawSlot());
+            case KIT_AUDIT_GAMEMODE -> handleKitAuditGamemode(player, session, event.getRawSlot());
+            case ROLLBACK_LOGS, EVIDENCE_BUNDLES, RANKED_BANS -> {
+                if (event.getRawSlot() == 49) services.gui().openStaffCenter(player);
+            }
             case ROLLBACK_PREVIEW -> handleRollbackPreview(player, session, event.getRawSlot());
             case PUNISH_TYPE -> handlePunishType(player, session, event.getRawSlot());
             case PUNISH_REASON -> handlePunishReason(player, session, event.getRawSlot());
@@ -226,6 +233,18 @@ public final class GuiListener implements Listener {
         if (slot == 16) {
             services.replays().printTimeline(player, session.context());
             player.closeInventory();
+        } else if (slot == 28 && services.replays().visualReplayEnabled()) {
+            services.gui().openVisualReplay(player, session.context());
+        }
+    }
+
+    private void handleVisualReplay(Player player, GuiSession session, int slot) {
+        String matchId = session.context();
+        if (slot == 48) {
+            services.replays().printTimeline(player, matchId);
+            player.closeInventory();
+        } else if (slot == 49) {
+            services.gui().openReplay(player, matchId);
         }
     }
 
@@ -240,7 +259,57 @@ public final class GuiListener implements Listener {
         } else if (slot == cfg.getInt("staff-center.items.live-matches", 10)) {
             player.closeInventory();
             player.performCommand("matches");
+        } else if (slot == cfg.getInt("staff-center.items.broken-arenas", 28)) {
+            services.gui().openBrokenArenas(player);
+        } else if (slot == cfg.getInt("staff-center.items.kit-audits", 30)) {
+            services.gui().openKitAuditPlayerPicker(player);
+        } else if (slot == cfg.getInt("staff-center.items.rollback-logs", 32)) {
+            services.gui().openRollbackLogs(player);
+        } else if (slot == cfg.getInt("staff-center.items.evidence-bundles", 34)) {
+            services.gui().openEvidenceBundles(player);
+        } else if (slot == cfg.getInt("staff-center.items.ranked-bans", 40)) {
+            services.gui().openRankedBans(player);
         }
+    }
+
+    private void handleStaffPanel(Player player, int slot) {
+        if (slot == 49) {
+            player.closeInventory();
+            return;
+        }
+        switch (slot) {
+            case 10 -> player.performCommand("staffstatus");
+            case 12 -> player.performCommand("reports");
+            case 14 -> player.sendMessage("§7Use §e/history <player> §7to view punishments.");
+            case 16 -> services.gui().openStaffAlerts(player);
+            case 28 -> player.performCommand("matches");
+            case 30 -> services.gui().openBrokenArenas(player);
+            case 32 -> player.sendMessage("§7Use §e/staffnote <player> <text> §7to add a note.");
+            default -> {}
+        }
+    }
+
+    private void handleKitAuditPlayer(Player staff, int slot) {
+        if (slot == 49) {
+            services.gui().openStaffCenter(staff);
+            return;
+        }
+        if (slot < 0 || slot >= 45) return;
+        var online = new java.util.ArrayList<>(org.bukkit.Bukkit.getOnlinePlayers());
+        if (slot >= online.size()) return;
+        services.gui().openKitAuditGamemodePicker(staff, online.get(slot).getUniqueId());
+    }
+
+    private void handleKitAuditGamemode(Player staff, GuiSession session, int slot) {
+        if (slot == 49) {
+            services.gui().openKitAuditPlayerPicker(staff);
+            return;
+        }
+        UUID target = UUID.fromString(session.context());
+        int index = slot - 10;
+        var modes = services.profiles().enabledGamemodes();
+        if (index < 0 || index >= modes.size()) return;
+        services.gui().openKitAudit(staff, target, modes.get(index));
     }
 
     private void handleRollbackPreview(Player player, GuiSession session, int slot) {

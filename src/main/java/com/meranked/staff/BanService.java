@@ -77,4 +77,13 @@ public final class BanService {
     }
 
     public record BanEntry(UUID uuid, String reason, String bannedBy, long bannedAt, long expiresAt) {}
+
+    /** Active ranked bans (non-expired). */
+    public java.util.List<BanEntry> activeBans() {
+        long now = System.currentTimeMillis();
+        return cache.values().stream()
+                .filter(e -> e.expiresAt() <= 0 || e.expiresAt() > now)
+                .sorted(java.util.Comparator.comparingLong(BanEntry::bannedAt).reversed())
+                .toList();
+    }
 }

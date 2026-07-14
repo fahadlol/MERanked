@@ -1,4 +1,4 @@
-package com.meranked.core.commands;
+package com.meranked.commands;
 
 import com.meranked.bootstrap.ServiceRegistry;
 import org.bukkit.command.Command;
@@ -7,11 +7,11 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
 
-public final class StaffPanelCommand implements CommandExecutor {
+public final class SpectateToggleCommand implements CommandExecutor {
 
     private final ServiceRegistry services;
 
-    public StaffPanelCommand(ServiceRegistry services) {
+    public SpectateToggleCommand(ServiceRegistry services) {
         this.services = services;
     }
 
@@ -19,14 +19,14 @@ public final class StaffPanelCommand implements CommandExecutor {
     public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command,
                              @NotNull String label, @NotNull String[] args) {
         if (!(sender instanceof Player player)) {
-            sender.sendMessage("Players only.");
+            services.messages().send(sender, "general.must-be-player");
             return true;
         }
-        if (!player.hasPermission("meranked.staff.panel")) {
-            player.sendMessage("§cNo permission.");
-            return true;
-        }
-        services.gui().openStaffPanel(player);
+        services.settings().toggle(player.getUniqueId(), "spectate-requests");
+        boolean enabled = services.settings().get(player.getUniqueId()).spectateRequestsEnabled();
+        player.sendMessage(enabled
+                ? "§aSpectate requests §lenabled§a."
+                : "§7Spectate requests §ldisabled§7.");
         return true;
     }
 }
