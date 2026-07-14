@@ -22,6 +22,6 @@ public final class QueueListener implements Listener {
         if (!services.kitEditor().createEditorItem().getItemMeta().displayName()
                 .equals(event.getItem().getItemMeta().displayName())) return;
         event.setCancelled(true);
-        services.kitEditor().enterEditor(event.getPlayer(), "Mace");
+        services.kitEditor().enterEditorAsync(event.getPlayer(), "Mace");
     }
 }

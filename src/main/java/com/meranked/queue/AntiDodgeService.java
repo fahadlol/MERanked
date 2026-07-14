@@ -17,6 +17,7 @@ import java.sql.ResultSet;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 
 public final class AntiDodgeService {
@@ -26,6 +27,7 @@ public final class AntiDodgeService {
     private final DatabaseService database;
     private final MessageService messages;
     private final Map<UUID, DodgeRecord> cache = new ConcurrentHashMap<>();
+    private final Map<UUID, CompletableFuture<DodgeRecord>> recordLoads = new ConcurrentHashMap<>();
 
     public AntiDodgeService(MERankedPlugin plugin, ConfigService configService,
                             DatabaseService database, MessageService messages) {
@@ -96,8 +98,59 @@ public final class AntiDodgeService {
         saveAsync(uuid, getRecord(uuid));
     }
 
+    public DodgeRecord getCachedRecord(UUID uuid) {
+        return cache.get(uuid);
+    }
+
     public DodgeRecord getRecord(UUID uuid) {
-        return cache.computeIfAbsent(uuid, this::loadRecord);
+        DodgeRecord cached = getCachedRecord(uuid);
+        if (cached != null) return cached;
+        loadRecordAsync(uuid);
+        return DodgeRecord.empty();
+    }
+
+    public CompletableFuture<DodgeRecord> loadRecordAsync(UUID uuid) {
+        DodgeRecord cached = cache.get(uuid);
+        if (cached != null) return CompletableFuture.completedFuture(cached);
+
+        CompletableFuture<DodgeRecord> existing = recordLoads.get(uuid);
+        if (existing != null) return existing;
+
+        CompletableFuture<DodgeRecord> created = new CompletableFuture<>();
+        CompletableFuture<DodgeRecord> prior = recordLoads.putIfAbsent(uuid, created);
+        if (prior != null) return prior;
+
+        database.queryAsync("loadDodgeRecord", conn -> {
+            try (PreparedStatement ps = conn.prepareStatement("SELECT * FROM ranked_dodges WHERE uuid = ?")) {
+                ps.setString(1, uuid.toString());
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (rs.next()) {
+                        return new DodgeRecord(
+                                rs.getInt("dodge_count"),
+                                rs.getLong("cooldown_until"),
+                                rs.getLong("hidden_until"),
+                                rs.getString("hidden_reason"),
+                                rs.getLong("last_dodge")
+                        );
+                    }
+                }
+            }
+            return DodgeRecord.empty();
+        }).whenComplete((record, error) -> {
+            recordLoads.remove(uuid);
+            if (error != null) {
+                plugin.getLogger().warning("Failed to load dodge record for " + uuid + ": " + error.getMessage());
+                created.complete(DodgeRecord.empty());
+                return;
+            }
+            cache.put(uuid, record);
+            created.complete(record);
+        });
+        return created;
+    }
+
+    public void preloadAsync(UUID uuid) {
+        loadRecordAsync(uuid);
     }
 
     private long calculateCooldown(int count) {
@@ -124,28 +177,8 @@ public final class AntiDodgeService {
         return 0;
     }
 
-    private DodgeRecord loadRecord(UUID uuid) {
-        return database.queryAsync(conn -> {
-            try (PreparedStatement ps = conn.prepareStatement("SELECT * FROM ranked_dodges WHERE uuid = ?")) {
-                ps.setString(1, uuid.toString());
-                try (ResultSet rs = ps.executeQuery()) {
-                    if (rs.next()) {
-                        return new DodgeRecord(
-                                rs.getInt("dodge_count"),
-                                rs.getLong("cooldown_until"),
-                                rs.getLong("hidden_until"),
-                                rs.getString("hidden_reason"),
-                                rs.getLong("last_dodge")
-                        );
-                    }
-                }
-            }
-            return DodgeRecord.empty();
-        }).join();
-    }
-
     private void saveAsync(UUID uuid, DodgeRecord record) {
-        database.executeAsync(conn -> {
+        database.executeAsync("saveDodgeRecord", conn -> {
             try (PreparedStatement ps = conn.prepareStatement("""
                 INSERT OR REPLACE INTO ranked_dodges
                 (uuid, dodge_count, cooldown_until, hidden_until, hidden_reason, last_dodge)

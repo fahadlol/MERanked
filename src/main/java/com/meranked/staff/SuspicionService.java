@@ -11,6 +11,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 
 public final class SuspicionService {
@@ -19,6 +20,7 @@ public final class SuspicionService {
     private final ConfigService configService;
     private final DatabaseService database;
     private final Map<UUID, Integer> cache = new ConcurrentHashMap<>();
+    private final Map<UUID, CompletableFuture<Integer>> scoreLoads = new ConcurrentHashMap<>();
     private final Map<UUID, java.util.List<GainEntry>> hourlyGains = new ConcurrentHashMap<>();
 
     public SuspicionService(MERankedPlugin plugin, ConfigService configService, DatabaseService database) {
@@ -33,8 +35,45 @@ public final class SuspicionService {
         plugin.tasks().runAsyncTimer(this::decayAll, 20L * 60 * 60, 20L * 60 * 60);
     }
 
+    public int getCachedScore(UUID uuid) {
+        return cache.getOrDefault(uuid, 0);
+    }
+
     public int getScore(UUID uuid) {
-        return cache.computeIfAbsent(uuid, this::loadScore);
+        if (cache.containsKey(uuid)) return cache.get(uuid);
+        loadScoreAsync(uuid);
+        return 0;
+    }
+
+    public CompletableFuture<Integer> loadScoreAsync(UUID uuid) {
+        if (cache.containsKey(uuid)) return CompletableFuture.completedFuture(cache.get(uuid));
+
+        CompletableFuture<Integer> existing = scoreLoads.get(uuid);
+        if (existing != null) return existing;
+
+        CompletableFuture<Integer> created = new CompletableFuture<>();
+        CompletableFuture<Integer> prior = scoreLoads.putIfAbsent(uuid, created);
+        if (prior != null) return prior;
+
+        database.queryAsync("loadSuspicionScore", conn -> {
+            try (PreparedStatement ps = conn.prepareStatement("SELECT suspicion_score FROM ranked_players WHERE uuid = ?")) {
+                ps.setString(1, uuid.toString());
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (rs.next()) return rs.getInt("suspicion_score");
+                }
+            }
+            return 0;
+        }).whenComplete((score, error) -> {
+            scoreLoads.remove(uuid);
+            if (error != null) {
+                plugin.getLogger().warning("Failed to load suspicion score for " + uuid + ": " + error.getMessage());
+                created.complete(0);
+                return;
+            }
+            cache.put(uuid, score);
+            created.complete(score);
+        });
+        return created;
     }
 
     public void addScore(UUID uuid, int amount, String reason) {
@@ -85,20 +124,8 @@ public final class SuspicionService {
         cache.forEach(this::saveScore);
     }
 
-    private int loadScore(UUID uuid) {
-        return database.queryAsync(conn -> {
-            try (PreparedStatement ps = conn.prepareStatement("SELECT suspicion_score FROM ranked_players WHERE uuid = ?")) {
-                ps.setString(1, uuid.toString());
-                try (ResultSet rs = ps.executeQuery()) {
-                    if (rs.next()) return rs.getInt("suspicion_score");
-                }
-            }
-            return 0;
-        }).join();
-    }
-
     private void saveScore(UUID uuid, int score) {
-        database.executeAsync(conn -> {
+        database.executeAsync("saveSuspicionScore", conn -> {
             try (PreparedStatement ps = conn.prepareStatement("UPDATE ranked_players SET suspicion_score = ? WHERE uuid = ?")) {
                 ps.setInt(1, score);
                 ps.setString(2, uuid.toString());
