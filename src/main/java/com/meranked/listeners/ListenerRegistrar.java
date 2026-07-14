@@ -18,7 +18,7 @@ public final class ListenerRegistrar {
     public void register() {
         register(new PlayerConnectionListener(services));
         register(new MatchListener(services));
-        register(new QueueListener(services));
+        register(new LobbyItemListener(services));
         register(new KitEditorListener(services));
         register(new CombatListener(services));
         register(new CommandBlockListener(services));

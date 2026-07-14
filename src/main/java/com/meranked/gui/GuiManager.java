@@ -78,6 +78,23 @@ public final class GuiManager {
         player.openInventory(inv);
     }
 
+    public void openKitEditorMenu(Player player) {
+        FileConfiguration guis = configService.get("guis.yml");
+        Inventory inv = Bukkit.createInventory(null, 45, TextUtil.parse(guis.getString("kit-editor-menu.title",
+                "<gradient:#D6B36A:#7C3AED><bold>Kit Editor</bold></gradient>")));
+        int slot = 10;
+        for (String mode : services.profiles().enabledGamemodes()) {
+            if (slot > 34) break;
+            Material icon = Material.CHEST;
+            try {
+                icon = Material.valueOf(configService.get("gamemodes.yml").getString("gamemodes." + mode + ".icon", "CHEST"));
+            } catch (Exception ignored) {}
+            inv.setItem(slot++, item(icon, "<gold>" + mode + "</gold>", "<yellow>Click to edit kit</yellow>"));
+        }
+        setSession(player, GuiSession.of(GuiType.KIT_EDITOR_MENU));
+        player.openInventory(inv);
+    }
+
     public void openProfile(Player player, String gamemode) {
         if (gamemode == null || gamemode.isEmpty()) gamemode = services.profiles().enabledGamemodes().get(0);
         RankedProfile p = services.profiles().getProfile(player.getUniqueId(), gamemode);

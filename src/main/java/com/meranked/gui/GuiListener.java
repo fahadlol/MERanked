@@ -33,6 +33,7 @@ public final class GuiListener implements Listener {
 
         switch (session.type()) {
             case RANKED_MENU -> handleRankedMenu(player, event.getRawSlot());
+            case KIT_EDITOR_MENU -> handleKitEditorMenu(player, event.getRawSlot());
             case SETTINGS -> handleSettings(player, event.getRawSlot());
             case STAFF_ALERTS -> handleStaffAlerts(player, event.getRawSlot());
             case STAFF_ALERT_DETAIL -> handleAlertDetail(player, session, event.getRawSlot());
@@ -75,6 +76,17 @@ public final class GuiListener implements Listener {
             int index = slot - 10;
             var modes = services.profiles().enabledGamemodes();
             if (index < modes.size()) services.queue().joinQueue(player, modes.get(index));
+        }
+    }
+
+    private void handleKitEditorMenu(Player player, int slot) {
+        if (slot >= 10 && slot <= 34) {
+            int index = slot - 10;
+            var modes = services.profiles().enabledGamemodes();
+            if (index < modes.size()) {
+                player.closeInventory();
+                services.kitEditor().enterEditor(player, modes.get(index));
+            }
         }
     }
 

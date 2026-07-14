@@ -86,6 +86,7 @@ public final class SpectateService {
         for (Player online : Bukkit.getOnlinePlayers()) {
             online.showPlayer(plugin, player);
         }
+        plugin.services().lobbyItems().giveLobbyItems(player);
         messages.send(player, "spectate.left");
     }
 

@@ -40,6 +40,7 @@ public final class UtilityService {
         FileConfiguration config = configService.get("config.yml");
         var loc = LocationUtil.fromConfig(config.getConfigurationSection("spawn"));
         if (loc != null) player.teleport(loc);
+        plugin.services().lobbyItems().giveLobbyItems(player);
         messages.sendPrefixed(player, "utility.spawn");
     }
 
