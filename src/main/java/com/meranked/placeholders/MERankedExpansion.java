@@ -20,7 +20,7 @@ public final class MERankedExpansion extends PlaceholderExpansion {
 
     @Override
     public @NotNull String getAuthor() {
-        return "MERanked";
+        return "Oblueberrey";
     }
 
     @Override

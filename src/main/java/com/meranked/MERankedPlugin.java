@@ -31,7 +31,7 @@ public final class MERankedPlugin extends JavaPlugin {
                 new MERankedExpansion(services).register();
                 getLogger().info("PlaceholderAPI hooked.");
             }
-            getLogger().info("MERanked enabled — Gold Rift theme active.");
+            getLogger().info("MERanked enabled - I cooked em.");
         })).exceptionally(ex -> {
             Throwable cause = ex.getCause() != null ? ex.getCause() : ex;
             getLogger().severe("Failed to initialize MERanked: " + cause.getMessage());
