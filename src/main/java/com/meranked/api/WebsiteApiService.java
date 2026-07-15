@@ -2,6 +2,7 @@ package com.meranked.api;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.meranked.api.ApiRateLimiter;
 import com.meranked.MERankedPlugin;
 import com.meranked.bootstrap.ServiceRegistry;
 import com.meranked.config.ConfigService;
@@ -23,6 +24,7 @@ public final class WebsiteApiService extends NanoHTTPD {
     private final ServiceRegistry services;
     private final Gson gson = new GsonBuilder().setPrettyPrinting().create();
     private boolean running;
+    private ApiRateLimiter rateLimiter;
 
     public WebsiteApiService(MERankedPlugin plugin, ConfigService configService, ServiceRegistry services) {
         super(configService.get("website.yml").getString("host", "0.0.0.0"),
@@ -35,6 +37,12 @@ public final class WebsiteApiService extends NanoHTTPD {
     public void start() {
         FileConfiguration config = configService.get("website.yml");
         if (!config.getBoolean("enabled", false)) return;
+        if (config.getBoolean("rate-limit.enabled", true)) {
+            int rpm = config.getInt("rate-limit.requests-per-minute", 120);
+            rateLimiter = new ApiRateLimiter(rpm, 60_000L);
+        } else {
+            rateLimiter = null;
+        }
         try {
             start(NanoHTTPD.SOCKET_READ_TIMEOUT, false);
             running = true;
@@ -55,6 +63,14 @@ public final class WebsiteApiService extends NanoHTTPD {
     public Response serve(IHTTPSession session) {
         String uri = URLDecoder.decode(session.getUri(), StandardCharsets.UTF_8);
         FileConfiguration config = configService.get("website.yml");
+
+        if (uri.startsWith("/api/") && rateLimiter != null) {
+            String clientKey = session.getRemoteIpAddress();
+            if (clientKey == null || clientKey.isBlank()) clientKey = "unknown";
+            if (!rateLimiter.tryAcquire(clientKey)) {
+                return json(Response.Status.TOO_MANY_REQUESTS, Map.of("error", "Rate limit exceeded"));
+            }
+        }
 
         if (config.getBoolean("serve-website", true) && !uri.startsWith("/api/")) {
             Response staticResponse = serveStatic(uri);
@@ -195,7 +211,7 @@ public final class WebsiteApiService extends NanoHTTPD {
         Map<String, Object> data = services.replays().loadReplay(matchId);
         if (data == null) return json(Response.Status.NOT_FOUND, Map.of("error", "Replay not found"));
         var timeline = services.replays().loadTimeline(matchId).stream()
-                .map(e -> Map.of("t", e.timestamp(), "desc", e.description()))
+                .map(e -> Map.of("t", e.timestamp(), "type", e.eventType(), "desc", e.description()))
                 .toList();
         Map<String, Object> out = new LinkedHashMap<>(data);
         out.put("timeline", timeline);

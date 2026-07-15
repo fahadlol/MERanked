@@ -44,3 +44,7 @@ replay:
 ranked-menu:
   title: "<gradient:#D6B36A:#7C3AED><bold>MERanked</bold></gradient>"
   size: 45
+
+kit-editor-menu:
+  title: "<gradient:#D6B36A:#7C3AED><bold>Kit Editor</bold></gradient>"
+  size: 45

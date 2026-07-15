@@ -2,6 +2,7 @@ package com.meranked.gui;
 
 public enum GuiType {
     RANKED_MENU,
+    KIT_EDITOR_MENU,
     PROFILE,
     PLACEMENT_RECAP,
     SETTINGS,
@@ -23,5 +24,12 @@ public enum GuiType {
     PUNISH_DURATION,
     PUNISH_CONFIRM,
     FAIRNESS_DASHBOARD,
-    STAFF_PANEL
+    STAFF_PANEL,
+    BROKEN_ARENAS,
+    KIT_AUDIT_PLAYER,
+    KIT_AUDIT_GAMEMODE,
+    ROLLBACK_LOGS,
+    EVIDENCE_BUNDLES,
+    RANKED_BANS,
+    VISUAL_REPLAY
 }

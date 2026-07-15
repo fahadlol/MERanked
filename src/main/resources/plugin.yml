@@ -42,7 +42,6 @@ commands:
     aliases: [tell, w, whisper]
   reply:
     description: Reply to last message
-    aliases: [r]
   msgtoggle:
     description: Toggle private messages
   socialspy:
@@ -63,13 +62,10 @@ commands:
   spectatedeny:
     description: Deny spectate request
   spectatetoggle:
-    description: Toggle spectate requests (use /settings)
+    description: Toggle spectate requests
+    aliases: [spectoggle]
   settings:
     description: Player settings
-  spectateaccept:
-    description: Accept spectate request
-  spectatedeny:
-    description: Deny spectate request
   punish:
     description: Open punishment GUI
     permission: meranked.punish

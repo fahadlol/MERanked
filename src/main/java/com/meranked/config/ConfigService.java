@@ -16,7 +16,7 @@ public final class ConfigService {
     private static final List<String> CONFIG_FILES = Arrays.asList(
             "config.yml", "messages.yml", "guis.yml", "tiers.yml", "gamemodes.yml",
             "seasons.yml", "database.yml", "anti-boost.yml", "anti-dodge.yml",
-            "kits.yml", "kit-editor.yml", "arenas.yml", "arena-voting.yml",
+            "kits.yml", "kit-editor.yml", "lobby-items.yml", "arenas.yml", "arena-voting.yml",
             "cinematic.yml", "scoreboards.yml", "regions.yml", "spectating.yml",
             "replays.yml", "website.yml", "staff-alerts.yml", "suspicion.yml",
             "utility.yml", "matchmaking.yml", "settings.yml",
@@ -46,6 +46,11 @@ public final class ConfigService {
         for (String fileName : CONFIG_FILES) {
             load(fileName);
         }
+        plugin.getLogger().info("Loaded " + CONFIG_FILES.size() + " configuration files.");
+    }
+
+    public int configFileCount() {
+        return CONFIG_FILES.size();
     }
 
     public FileConfiguration load(String fileName) {

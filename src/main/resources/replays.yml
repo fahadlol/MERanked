@@ -2,7 +2,7 @@ enabled: true
 batch-events: true
 batch-interval-ms: 1000
 max-events-per-match: 500
-visual-replay-enabled: false
+visual-replay-enabled: true
 store-combat-stats: true
 
 event-types:

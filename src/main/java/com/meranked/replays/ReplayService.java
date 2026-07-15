@@ -6,7 +6,9 @@ import com.meranked.MERankedPlugin;
 import com.meranked.config.ConfigService;
 import com.meranked.database.DatabaseService;
 import com.meranked.model.RankedMatch;
+import org.bukkit.Material;
 import org.bukkit.configuration.file.FileConfiguration;
+import org.bukkit.entity.Player;
 
 import java.sql.PreparedStatement;
 import java.util.ArrayList;
@@ -29,15 +31,23 @@ public final class ReplayService {
         plugin.tasks().runAsyncTimer(this::flushEvents, 20L, 20L);
     }
 
+    public boolean visualReplayEnabled() {
+        return configService.get("replays.yml").getBoolean("visual-replay-enabled", true);
+    }
+
     public void recordEvent(String matchId, String description) {
+        recordEvent(matchId, "UNKNOWN", description);
+    }
+
+    public void recordEvent(String matchId, String eventType, String description) {
         FileConfiguration config = configService.get("replays.yml");
         if (!config.getBoolean("enabled", true)) return;
         pendingEvents.computeIfAbsent(matchId, k -> new ArrayList<>())
-                .add(new ReplayEvent(System.currentTimeMillis(), description));
+                .add(new ReplayEvent(System.currentTimeMillis(), eventType, description));
     }
 
     public void recordCombatEvent(RankedMatch match, String type, String description) {
-        recordEvent(match.matchId(), description);
+        recordEvent(match.matchId(), type, description);
     }
 
     public void saveMatch(RankedMatch match) {
@@ -75,11 +85,24 @@ public final class ReplayService {
         return database.queryAsync(conn -> {
             List<ReplayEvent> events = new ArrayList<>();
             try (PreparedStatement ps = conn.prepareStatement(
-                    "SELECT timestamp_ms, description FROM ranked_replay_events WHERE match_id = ? ORDER BY timestamp_ms ASC")) {
+                    "SELECT timestamp_ms, event_type, description FROM ranked_replay_events WHERE match_id = ? ORDER BY timestamp_ms ASC")) {
                 ps.setString(1, matchId);
                 try (var rs = ps.executeQuery()) {
                     while (rs.next()) {
-                        events.add(new ReplayEvent(rs.getLong("timestamp_ms"), rs.getString("description")));
+                        String type = rs.getString("event_type");
+                        if (type == null || type.isBlank()) type = "UNKNOWN";
+                        events.add(new ReplayEvent(rs.getLong("timestamp_ms"), type, rs.getString("description")));
+                    }
+                }
+            } catch (java.sql.SQLException ex) {
+                try (PreparedStatement ps = conn.prepareStatement(
+                        "SELECT timestamp_ms, description FROM ranked_replay_events WHERE match_id = ? ORDER BY timestamp_ms ASC")) {
+                    ps.setString(1, matchId);
+                    try (var rs = ps.executeQuery()) {
+                        while (rs.next()) {
+                            String desc = rs.getString("description");
+                            events.add(new ReplayEvent(rs.getLong("timestamp_ms"), inferType(desc), desc));
+                        }
                     }
                 }
             }
@@ -105,7 +128,7 @@ public final class ReplayService {
         }).join();
     }
 
-    public void printTimeline(org.bukkit.entity.Player viewer, String matchId) {
+    public void printTimeline(Player viewer, String matchId) {
         plugin.tasks().runAsync(() -> {
             List<ReplayEvent> events = loadTimeline(matchId);
             plugin.tasks().runSync(() -> {
@@ -123,6 +146,33 @@ public final class ReplayService {
         });
     }
 
+    public Material iconForType(String eventType) {
+        if (eventType == null) return Material.PAPER;
+        return switch (eventType.toUpperCase()) {
+            case "DAMAGE_DEALT", "HIT_LANDED", "CRITICAL_HIT" -> Material.IRON_SWORD;
+            case "TOTEM_POP" -> Material.TOTEM_OF_UNDYING;
+            case "CRYSTAL_PLACED", "CRYSTAL_BROKEN" -> Material.END_CRYSTAL;
+            case "ANCHOR_USED" -> Material.RESPAWN_ANCHOR;
+            case "OBSIDIAN_PLACED" -> Material.OBSIDIAN;
+            case "PEARL_THROWN" -> Material.ENDER_PEARL;
+            case "GOLDEN_APPLE_EATEN" -> Material.GOLDEN_APPLE;
+            case "POTION_USED" -> Material.SPLASH_POTION;
+            case "DEATH", "DISCONNECT" -> Material.SKELETON_SKULL;
+            default -> Material.PAPER;
+        };
+    }
+
+    private String inferType(String description) {
+        if (description == null) return "UNKNOWN";
+        String lower = description.toLowerCase();
+        if (lower.contains("damage")) return "DAMAGE_DEALT";
+        if (lower.contains("totem")) return "TOTEM_POP";
+        if (lower.contains("crystal")) return "CRYSTAL_PLACED";
+        if (lower.contains("death") || lower.contains("died")) return "DEATH";
+        if (lower.contains("disconnect") || lower.contains("quit")) return "DISCONNECT";
+        return "UNKNOWN";
+    }
+
     private String formatTime(long totalSeconds) {
         long m = totalSeconds / 60;
         long s = totalSeconds % 60;
@@ -138,17 +188,29 @@ public final class ReplayService {
         if (events == null || events.isEmpty()) return;
         database.executeAsync(conn -> {
             try (PreparedStatement ps = conn.prepareStatement(
-                    "INSERT INTO ranked_replay_events (match_id, timestamp_ms, description) VALUES (?, ?, ?)")) {
+                    "INSERT INTO ranked_replay_events (match_id, timestamp_ms, event_type, description) VALUES (?, ?, ?, ?)")) {
                 for (ReplayEvent event : events) {
                     ps.setString(1, matchId);
                     ps.setLong(2, event.timestamp());
-                    ps.setString(3, event.description());
+                    ps.setString(3, event.eventType());
+                    ps.setString(4, event.description());
                     ps.addBatch();
                 }
                 ps.executeBatch();
+            } catch (java.sql.SQLException ex) {
+                try (PreparedStatement ps = conn.prepareStatement(
+                        "INSERT INTO ranked_replay_events (match_id, timestamp_ms, description) VALUES (?, ?, ?)")) {
+                    for (ReplayEvent event : events) {
+                        ps.setString(1, matchId);
+                        ps.setLong(2, event.timestamp());
+                        ps.setString(3, event.description());
+                        ps.addBatch();
+                    }
+                    ps.executeBatch();
+                }
             }
         });
     }
 
-    public record ReplayEvent(long timestamp, String description) {}
+    public record ReplayEvent(long timestamp, String eventType, String description) {}
 }

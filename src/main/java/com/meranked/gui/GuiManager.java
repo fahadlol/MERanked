@@ -78,6 +78,23 @@ public final class GuiManager {
         player.openInventory(inv);
     }
 
+    public void openKitEditorMenu(Player player) {
+        FileConfiguration guis = configService.get("guis.yml");
+        Inventory inv = Bukkit.createInventory(null, 45, TextUtil.parse(guis.getString("kit-editor-menu.title",
+                "<gradient:#D6B36A:#7C3AED><bold>Kit Editor</bold></gradient>")));
+        int slot = 10;
+        for (String mode : services.profiles().enabledGamemodes()) {
+            if (slot > 34) break;
+            Material icon = Material.CHEST;
+            try {
+                icon = Material.valueOf(configService.get("gamemodes.yml").getString("gamemodes." + mode + ".icon", "CHEST"));
+            } catch (Exception ignored) {}
+            inv.setItem(slot++, item(icon, "<gold>" + mode + "</gold>", "<yellow>Click to edit kit</yellow>"));
+        }
+        setSession(player, GuiSession.of(GuiType.KIT_EDITOR_MENU));
+        player.openInventory(inv);
+    }
+
     public void openProfile(Player player, String gamemode) {
         if (gamemode == null || gamemode.isEmpty()) gamemode = services.profiles().enabledGamemodes().get(0);
         RankedProfile p = services.profiles().getProfile(player.getUniqueId(), gamemode);
@@ -210,6 +227,10 @@ public final class GuiManager {
         inv.setItem(12, item(Material.DIAMOND_SWORD, "<green>Winner</green>", winner));
         inv.setItem(14, item(Material.IRON_SWORD, "<red>Loser</red>", loser));
         inv.setItem(16, item(Material.CLOCK, "Combat Timeline", eventCount + " events", "<yellow>Click to print</yellow>"));
+        if (services.replays().visualReplayEnabled()) {
+            inv.setItem(28, item(Material.SPYGLASS, "<gold>Visual Replay</gold>",
+                    eventCount + " events", "<yellow>Click to open</yellow>"));
+        }
         inv.setItem(30, item(Material.PAPER, "Rating Change",
                 Boolean.TRUE.equals(data.get("noRating")) ? "<red>No rating applied</red>" : "Rated match"));
         setSession(viewer, GuiSession.of(GuiType.REPLAY, matchId));
@@ -457,6 +478,183 @@ public final class GuiManager {
         inv.setItem(49, item(Material.RED_CONCRETE, "<red>Close</red>", "Close panel"));
         setSession(staff, GuiSession.of(GuiType.STAFF_PANEL));
         staff.openInventory(inv);
+    }
+
+    public void openBrokenArenas(Player staff) {
+        Inventory inv = Bukkit.createInventory(null, 54, TextUtil.parse("<red>Broken / Disabled Arenas</red>"));
+        int slot = 0;
+        for (var arena : services.arenas().allArenas()) {
+            if (slot >= 45) break;
+            if (!arena.broken() && arena.enabled()) continue;
+            String status = arena.broken() ? "Broken" : "Disabled";
+            String reason = arena.brokenReason() == null ? "" : arena.brokenReason();
+            inv.setItem(slot++, item(Material.BARRIER, "<red>" + arena.name() + "</red>",
+                    status, reason.isEmpty() ? "No reason recorded" : reason));
+        }
+        if (slot == 0) {
+            inv.setItem(22, item(Material.LIME_DYE, "<green>All arenas healthy</green>", "No issues found"));
+        }
+        inv.setItem(49, item(Material.RED_CONCRETE, "<red>Back</red>", "Return to staff center"));
+        setSession(staff, GuiSession.of(GuiType.BROKEN_ARENAS));
+        staff.openInventory(inv);
+    }
+
+    public void openKitAuditPlayerPicker(Player staff) {
+        Inventory inv = Bukkit.createInventory(null, 54, TextUtil.parse("<gold>Kit Audit — Select Player</gold>"));
+        int slot = 0;
+        for (Player online : Bukkit.getOnlinePlayers()) {
+            if (slot >= 45) break;
+            ItemStack skull = new ItemStack(Material.PLAYER_HEAD);
+            SkullMeta meta = (SkullMeta) skull.getItemMeta();
+            meta.setOwningPlayer(online);
+            meta.displayName(TextUtil.parse("<gold>" + online.getName() + "</gold>"));
+            meta.lore(List.of(TextUtil.parse("<gray>Click to pick gamemode</gray>")));
+            skull.setItemMeta(meta);
+            inv.setItem(slot++, skull);
+        }
+        if (slot == 0) {
+            inv.setItem(22, item(Material.BARRIER, "<red>No players online</red>", "Try again later"));
+        }
+        inv.setItem(49, item(Material.RED_CONCRETE, "<red>Back</red>", "Return to staff center"));
+        setSession(staff, GuiSession.of(GuiType.KIT_AUDIT_PLAYER));
+        staff.openInventory(inv);
+    }
+
+    public void openKitAuditGamemodePicker(Player staff, UUID target) {
+        String name = Bukkit.getOfflinePlayer(target).getName();
+        Inventory inv = Bukkit.createInventory(null, 54, TextUtil.parse("Kit Audit — " + (name == null ? target : name)));
+        int slot = 10;
+        for (String mode : services.profiles().enabledGamemodes()) {
+            if (slot > 34) break;
+            inv.setItem(slot++, item(Material.CHEST, "<gold>" + mode + "</gold>", "Audit kit for this gamemode"));
+        }
+        inv.setItem(49, item(Material.RED_CONCRETE, "<red>Back</red>", "Pick another player"));
+        setSession(staff, GuiSession.of(GuiType.KIT_AUDIT_GAMEMODE, target.toString()));
+        staff.openInventory(inv);
+    }
+
+    public void openRollbackLogs(Player staff) {
+        plugin.tasks().runAsync(() -> {
+            var logs = services.rollback().recentLogs(45);
+            plugin.tasks().runSync(() -> {
+                Inventory inv = Bukkit.createInventory(null, 54, TextUtil.parse("<gold>Rollback Logs</gold>"));
+                int slot = 0;
+                for (var log : logs) {
+                    if (slot >= 45) break;
+                    String staffName = log.staffUuid();
+                    try {
+                        String resolved = Bukkit.getOfflinePlayer(UUID.fromString(log.staffUuid())).getName();
+                        if (resolved != null) staffName = resolved;
+                    } catch (IllegalArgumentException ignored) {}
+                    inv.setItem(slot++, item(Material.CLOCK, "<gray>" + log.matchIds() + "</gray>",
+                            "By: " + (staffName == null ? log.staffUuid() : staffName),
+                            "Reason: " + log.reason(),
+                            formatWhen(log.createdAt())));
+                }
+                if (slot == 0) {
+                    inv.setItem(22, item(Material.PAPER, "<gray>No rollbacks yet</gray>", "Nothing recorded"));
+                }
+                inv.setItem(49, item(Material.RED_CONCRETE, "<red>Back</red>", "Return to staff center"));
+                setSession(staff, GuiSession.of(GuiType.ROLLBACK_LOGS));
+                staff.openInventory(inv);
+            });
+        });
+    }
+
+    public void openEvidenceBundles(Player staff) {
+        plugin.tasks().runAsync(() -> {
+            var bundles = services.evidence().recentBundles(45);
+            plugin.tasks().runSync(() -> {
+                Inventory inv = Bukkit.createInventory(null, 54, TextUtil.parse("<gold>Evidence Bundles</gold>"));
+                int slot = 0;
+                for (var bundle : bundles) {
+                    if (slot >= 45) break;
+                    inv.setItem(slot++, item(Material.WRITABLE_BOOK, "<gold>" + bundle.bundleId() + "</gold>",
+                            bundle.targetType() + ": " + bundle.targetId(),
+                            bundle.reason(),
+                            "Suspicion: " + bundle.suspicion() + "/100",
+                            formatWhen(bundle.createdAt())));
+                }
+                if (slot == 0) {
+                    inv.setItem(22, item(Material.PAPER, "<gray>No bundles yet</gray>", "Generate with /ranked evidence"));
+                }
+                inv.setItem(49, item(Material.RED_CONCRETE, "<red>Back</red>", "Return to staff center"));
+                setSession(staff, GuiSession.of(GuiType.EVIDENCE_BUNDLES));
+                staff.openInventory(inv);
+            });
+        });
+    }
+
+    public void openRankedBans(Player staff) {
+        Inventory inv = Bukkit.createInventory(null, 54, TextUtil.parse("<gold>Active Ranked Bans</gold>"));
+        int slot = 0;
+        for (var ban : services.bans().activeBans()) {
+            if (slot >= 45) break;
+            String name = Bukkit.getOfflinePlayer(ban.uuid()).getName();
+            String expires = ban.expiresAt() <= 0 ? "Permanent"
+                    : "Until " + formatWhen(ban.expiresAt());
+            ItemStack skull = new ItemStack(Material.PLAYER_HEAD);
+            SkullMeta meta = (SkullMeta) skull.getItemMeta();
+            meta.setOwningPlayer(Bukkit.getOfflinePlayer(ban.uuid()));
+            meta.displayName(TextUtil.parse("<red>" + (name == null ? ban.uuid().toString() : name) + "</red>"));
+            meta.lore(List.of(
+                    TextUtil.parse("<gray>Reason: " + ban.reason() + "</gray>"),
+                    TextUtil.parse("<gray>By: " + ban.bannedBy() + "</gray>"),
+                    TextUtil.parse("<gray>" + expires + "</gray>")
+            ));
+            skull.setItemMeta(meta);
+            inv.setItem(slot++, skull);
+        }
+        if (slot == 0) {
+            inv.setItem(22, item(Material.LIME_DYE, "<green>No active ranked bans</green>", "All clear"));
+        }
+        inv.setItem(49, item(Material.RED_CONCRETE, "<red>Back</red>", "Return to staff center"));
+        setSession(staff, GuiSession.of(GuiType.RANKED_BANS));
+        staff.openInventory(inv);
+    }
+
+    public void openVisualReplay(Player viewer, String matchId) {
+        plugin.tasks().runAsync(() -> {
+            List<com.meranked.replays.ReplayService.ReplayEvent> events = services.replays().loadTimeline(matchId);
+            plugin.tasks().runSync(() -> renderVisualReplay(viewer, matchId, events));
+        });
+    }
+
+    private void renderVisualReplay(Player viewer, String matchId,
+                                    List<com.meranked.replays.ReplayService.ReplayEvent> events) {
+        Inventory inv = Bukkit.createInventory(null, 54, TextUtil.parse("<gold>Visual Replay — " + matchId + "</gold>"));
+        if (events.isEmpty()) {
+            inv.setItem(22, item(Material.BARRIER, "<red>No events recorded</red>", matchId));
+        } else {
+            long start = events.get(0).timestamp();
+            int slot = 0;
+            for (var event : events) {
+                if (slot >= 45) break;
+                long sec = (event.timestamp() - start) / 1000;
+                Material icon = services.replays().iconForType(event.eventType());
+                inv.setItem(slot++, item(icon,
+                        "<yellow>[" + formatReplayTime(sec) + "]</yellow> <white>" + event.eventType() + "</white>",
+                        event.description()));
+            }
+        }
+        inv.setItem(48, item(Material.BOOK, "<gray>Text Timeline</gray>", "Print to chat"));
+        inv.setItem(49, item(Material.RED_CONCRETE, "<red>Close</red>", "Return to replay summary"));
+        setSession(viewer, GuiSession.of(GuiType.VISUAL_REPLAY, matchId));
+        viewer.openInventory(inv);
+    }
+
+    private String formatWhen(long epochMs) {
+        long agoSec = Math.max(0, (System.currentTimeMillis() - epochMs) / 1000);
+        if (agoSec < 60) return agoSec + "s ago";
+        if (agoSec < 3600) return (agoSec / 60) + "m ago";
+        if (agoSec < 86400) return (agoSec / 3600) + "h ago";
+        return (agoSec / 86400) + "d ago";
+    }
+
+    private String formatReplayTime(long totalSeconds) {
+        long m = totalSeconds / 60;
+        long s = totalSeconds % 60;
+        return String.format("%d:%02d", m, s);
     }
 
     // ---- Rollback Preview ----

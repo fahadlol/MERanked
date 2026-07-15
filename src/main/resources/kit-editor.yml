@@ -1,11 +1,6 @@
 enabled: true
-editor-item:
-  material: NETHER_STAR
-  name: "<gradient:#D6B36A:#7C3AED><bold>Kit Editor</bold></gradient>"
-  lore:
-    - "<gray>Right-click to edit your ranked kits.</gray>"
 
-armor-trims:
+# Lobby hotbar items are configured in lobby-items.yml
   enabled: true
   allow-trim-materials:
     - diamond

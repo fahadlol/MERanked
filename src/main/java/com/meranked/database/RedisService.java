@@ -26,7 +26,10 @@ public final class RedisService {
         return CompletableFuture.runAsync(() -> {
             FileConfiguration config = configService.get("database.yml");
             enabled = config.getBoolean("redis.enabled", false);
-            if (!enabled) return;
+            if (!enabled) {
+                plugin.getLogger().info("Redis disabled (set redis.enabled in database.yml to enable).");
+                return;
+            }
 
             JedisPoolConfig poolConfig = new JedisPoolConfig();
             poolConfig.setMaxTotal(16);
@@ -41,7 +44,7 @@ public final class RedisService {
             } else {
                 pool = new JedisPool(poolConfig, host, port, 2000, password, database);
             }
-            plugin.getLogger().info("Redis connected for future scaling.");
+            plugin.getLogger().info("Redis connected (" + host + ":" + port + ", db " + database + ").");
         });
     }
 

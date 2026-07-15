@@ -19,17 +19,24 @@ public final class MERankedPlugin extends JavaPlugin {
     public void onEnable() {
         instance = this;
         scheduler = new TaskScheduler(this);
+        getLogger().info("Starting MERanked v" + getPluginMeta().getVersion() + "...");
 
         services = new ServiceRegistry(this);
+        getLogger().info("[1/4] Loading core services...");
         services.registerCore();
+
+        getLogger().info("[2/4] Loading configuration (" + services.config().configFileCount() + " files)...");
         services.loadConfigs();
+
+        getLogger().info("[3/4] Initializing database and Redis...");
         services.initializeAsync().thenRun(() -> getServer().getScheduler().runTask(this, () -> {
+            getLogger().info("[4/4] Registering modules, commands, and listeners...");
             services.registerModules();
             new CommandRegistrar(this, services).register();
             new ListenerRegistrar(this, services).register();
             if (getServer().getPluginManager().getPlugin("PlaceholderAPI") != null) {
                 new MERankedExpansion(services).register();
-                getLogger().info("PlaceholderAPI hooked.");
+                getLogger().info("PlaceholderAPI expansion registered.");
             }
             getLogger().info("MERanked enabled - I cooked em.");
         })).exceptionally(ex -> {
