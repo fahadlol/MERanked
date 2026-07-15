@@ -33,6 +33,7 @@ public final class KitEditorService {
     private final KitService kitService;
     private final MessageService messages;
     private final Map<UUID, EditorSession> sessions = new ConcurrentHashMap<>();
+    private final Map<UUID, Boolean> pendingOpens = new ConcurrentHashMap<>();
 
     public KitEditorService(MERankedPlugin plugin, ConfigService configService,
                             KitService kitService, MessageService messages) {
@@ -58,6 +59,36 @@ public final class KitEditorService {
     }
 
     public void enterEditor(Player player, String gamemode) {
+        enterEditorAsync(player, gamemode);
+    }
+
+    public void enterEditorAsync(Player player, String gamemode) {
+        UUID uuid = player.getUniqueId();
+        if (sessions.containsKey(uuid)) return;
+        if (pendingOpens.putIfAbsent(uuid, Boolean.TRUE) != null) return;
+
+        KitService.StoredKit cached = kitService.getCachedKit(uuid, gamemode);
+        if (cached != null) {
+            pendingOpens.remove(uuid);
+            openEditor(player, gamemode, cached);
+            return;
+        }
+
+        messages.send(player, "kit-editor.loading");
+        kitService.getKitAsync(uuid, gamemode).whenComplete((kit, error) ->
+                plugin.tasks().runSync(() -> {
+                    pendingOpens.remove(uuid);
+                    if (!player.isOnline()) return;
+                    if (sessions.containsKey(uuid)) return;
+                    if (error != null) {
+                        messages.send(player, "kit-editor.load-failed");
+                        return;
+                    }
+                    openEditor(player, gamemode, kit);
+                }));
+    }
+
+    private void openEditor(Player player, String gamemode, KitService.StoredKit kit) {
         if (sessions.containsKey(player.getUniqueId())) return;
         FileConfiguration config = configService.get("config.yml");
         var loc = LocationUtil.fromConfig(config.getConfigurationSection("kit-editor-spawn"));
@@ -72,7 +103,6 @@ public final class KitEditorService {
             online.hidePlayer(plugin, player);
         }
 
-        KitService.StoredKit kit = kitService.getKit(player.getUniqueId(), gamemode);
         player.getInventory().clear();
         player.getInventory().setArmorContents(kit.armor());
         player.getInventory().setContents(kit.inventory());
@@ -103,6 +133,7 @@ public final class KitEditorService {
 
     public void leaveEditor(Player player) {
         EditorSession session = sessions.remove(player.getUniqueId());
+        pendingOpens.remove(player.getUniqueId());
         if (session == null) return;
 
         session.controlEntities.forEach(org.bukkit.entity.Entity::remove);
@@ -172,10 +203,13 @@ public final class KitEditorService {
             case "revert" -> {
                 EditorSession session = sessions.get(player.getUniqueId());
                 if (session == null) return;
-                KitService.StoredKit kit = kitService.getKit(player.getUniqueId(), session.gamemode());
-                player.getInventory().setContents(kit.inventory());
-                player.getInventory().setArmorContents(kit.armor());
-                messages.send(player, "kit-editor.reverted");
+                kitService.getKitAsync(player.getUniqueId(), session.gamemode()).thenAccept(kit ->
+                        plugin.tasks().runSync(() -> {
+                            if (!player.isOnline() || sessions.get(player.getUniqueId()) == null) return;
+                            player.getInventory().setContents(kit.inventory());
+                            player.getInventory().setArmorContents(kit.armor());
+                            messages.send(player, "kit-editor.reverted");
+                        }));
             }
             case "trims" -> plugin.services().gui().openTrimEditor(player);
             case "enderchest" -> {

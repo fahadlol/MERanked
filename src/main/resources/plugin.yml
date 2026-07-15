@@ -109,6 +109,9 @@ commands:
   staffnote:
     description: Add staff note
     permission: meranked.staff.note
+  merankeddb:
+    description: Show database/cache debug metrics
+    permission: meranked.admin.debug
 permissions:
   meranked.*:
     description: All MERanked permissions
@@ -122,6 +125,9 @@ permissions:
       meranked.kit.reset: true
   meranked.admin:
     description: Admin commands
+    default: op
+  meranked.admin.debug:
+    description: Database debug metrics
     default: op
   meranked.staff:
     description: Staff commands

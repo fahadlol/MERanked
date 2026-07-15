@@ -13,15 +13,30 @@ import java.sql.Statement;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 
 public final class DatabaseService {
+
+    private static final String SQLITE_INIT_SQL = """
+            PRAGMA journal_mode=WAL;
+            PRAGMA synchronous=NORMAL;
+            PRAGMA foreign_keys=ON;
+            PRAGMA busy_timeout=5000;
+            """;
 
     private final MERankedPlugin plugin;
     private final ConfigService configService;
     private HikariDataSource dataSource;
     private ExecutorService executor;
     private String databaseType;
+    private final AtomicBoolean acceptingOperations = new AtomicBoolean(true);
+    private final AtomicInteger activeOperations = new AtomicInteger();
+    private final AtomicInteger queuedOperations = new AtomicInteger();
 
     public DatabaseService(MERankedPlugin plugin, ConfigService configService) {
         this.plugin = plugin;
@@ -38,6 +53,8 @@ public final class DatabaseService {
 
                 if ("MYSQL".equals(databaseType)) {
                     config.setMaximumPoolSize(dbConfig.getInt("mysql.pool-size", 10));
+                    config.setMinimumIdle(dbConfig.getInt("mysql.minimum-idle", 2));
+                    config.setConnectionTimeout(dbConfig.getLong("mysql.connection-timeout-ms", 30000L));
                     config.setDriverClassName("com.mysql.cj.jdbc.Driver");
                     String host = dbConfig.getString("mysql.host", "localhost");
                     int port = dbConfig.getInt("mysql.port", 3306);
@@ -49,7 +66,10 @@ public final class DatabaseService {
                 } else {
                     databaseType = "SQLITE";
                     config.setMaximumPoolSize(1);
+                    config.setMinimumIdle(1);
+                    config.setConnectionTimeout(30000L);
                     config.setDriverClassName("org.sqlite.JDBC");
+                    config.setConnectionInitSql(SQLITE_INIT_SQL);
                     File dataFolder = configService.getDataFolder();
                     if (!dataFolder.exists() && !dataFolder.mkdirs()) {
                         throw new SQLException("Failed to create plugin data folder: " + dataFolder.getAbsolutePath());
@@ -63,7 +83,11 @@ public final class DatabaseService {
                 }
 
                 dataSource = new HikariDataSource(config);
-                executor = Executors.newFixedThreadPool(Math.max(2, Runtime.getRuntime().availableProcessors() / 2));
+                executor = Executors.newSingleThreadExecutor(r -> {
+                    Thread t = new Thread(r, "MERanked-Database");
+                    t.setDaemon(true);
+                    return t;
+                });
                 createTables();
                 if ("SQLITE".equals(databaseType)) {
                     File dbFile = new File(configService.getDataFolder(),
@@ -81,7 +105,7 @@ public final class DatabaseService {
     }
 
     private void createTables() {
-        executeSync(conn -> {
+        executeSync("createTables", conn -> {
             try (Statement stmt = conn.createStatement()) {
                 stmt.execute("""
                     CREATE TABLE IF NOT EXISTS ranked_players (
@@ -456,48 +480,153 @@ public final class DatabaseService {
     }
 
     public Connection getConnection() throws SQLException {
+        if (!acceptingOperations.get()) {
+            throw new SQLException("Database is shutting down");
+        }
         return dataSource.getConnection();
     }
 
-    public void executeSync(SqlConsumer consumer) {
+    public void executeSync(String operation, SqlConsumer consumer) {
         try (Connection conn = getConnection()) {
             consumer.accept(conn);
         } catch (SQLException ex) {
-            plugin.getLogger().severe("Database error: " + ex.getMessage());
+            logError(operation, ex);
         }
     }
 
-    public <T> CompletableFuture<T> queryAsync(SqlFunction<T> function) {
-        return CompletableFuture.supplyAsync(() -> {
+    public <T> T querySync(String operation, SqlFunction<T> function) {
+        try (Connection conn = getConnection()) {
+            return function.apply(conn);
+        } catch (SQLException ex) {
+            logError(operation, ex);
+            throw new java.util.concurrent.CompletionException(ex);
+        }
+    }
+
+    public <T> CompletableFuture<T> queryAsync(String operation, SqlFunction<T> function) {
+        return submit(operation, () -> {
             try (Connection conn = getConnection()) {
                 return function.apply(conn);
             } catch (SQLException ex) {
-                // Log so transient outages are visible even for fire-and-forget writes whose future is never awaited.
-                plugin.getLogger().severe("Database operation failed: " + ex.getMessage());
                 throw new java.util.concurrent.CompletionException(ex);
             }
-        }, executor);
+        });
     }
 
-    public CompletableFuture<Void> executeAsync(SqlConsumer consumer) {
-        return queryAsync(conn -> {
+    public CompletableFuture<Void> executeAsync(String operation, SqlConsumer consumer) {
+        return queryAsync(operation, conn -> {
             consumer.accept(conn);
             return null;
         });
     }
 
+    /** Runs arbitrary work on the database executor (no connection held by caller). */
+    public <T> CompletableFuture<T> supplyAsync(Supplier<T> supplier) {
+        return submit("supplyAsync", supplier);
+    }
+
+    private <T> CompletableFuture<T> submit(String operation, Supplier<T> supplier) {
+        if (!acceptingOperations.get()) {
+            return CompletableFuture.failedFuture(new RejectedExecutionException("Database is shutting down"));
+        }
+        queuedOperations.incrementAndGet();
+        CompletableFuture<T> future = new CompletableFuture<>();
+        try {
+            executor.execute(() -> {
+                queuedOperations.decrementAndGet();
+                activeOperations.incrementAndGet();
+                try {
+                    future.complete(supplier.get());
+                } catch (Exception ex) {
+                    logError(operation, ex);
+                    future.completeExceptionally(ex);
+                } finally {
+                    activeOperations.decrementAndGet();
+                }
+            });
+        } catch (RejectedExecutionException ex) {
+            queuedOperations.decrementAndGet();
+            future.completeExceptionally(ex);
+        }
+        return future;
+    }
+
+    /** @deprecated use {@link #executeAsync(String, SqlConsumer)} */
+    @Deprecated
+    public void executeSync(SqlConsumer consumer) {
+        executeSync("legacyExecuteSync", consumer);
+    }
+
+    /** @deprecated use {@link #queryAsync(String, SqlFunction)} */
+    @Deprecated
+    public <T> CompletableFuture<T> queryAsync(SqlFunction<T> function) {
+        return queryAsync("legacyQueryAsync", function);
+    }
+
+    /** @deprecated use {@link #executeAsync(String, SqlConsumer)} */
+    @Deprecated
+    public CompletableFuture<Void> executeAsync(SqlConsumer consumer) {
+        return executeAsync("legacyExecuteAsync", consumer);
+    }
+
     /** @deprecated use SqlConsumer overload */
     @Deprecated
     public void executeSyncLegacy(Consumer<Connection> consumer) {
-        executeSync(conn -> consumer.accept(conn));
+        executeSync("legacyExecuteSyncLegacy", conn -> consumer.accept(conn));
+    }
+
+    private void logError(String operation, Exception ex) {
+        plugin.getLogger().severe("Database operation failed [" + operation + "]: " + ex.getMessage());
     }
 
     public String databaseType() {
         return databaseType;
     }
 
+    public boolean isAcceptingOperations() {
+        return acceptingOperations.get();
+    }
+
+    public int activeOperations() {
+        return activeOperations.get();
+    }
+
+    public int queuedOperations() {
+        return queuedOperations.get();
+    }
+
+    public int hikariActiveConnections() {
+        if (dataSource == null) return 0;
+        return dataSource.getHikariPoolMXBean() == null ? 0 : dataSource.getHikariPoolMXBean().getActiveConnections();
+    }
+
+    public int hikariIdleConnections() {
+        if (dataSource == null) return 0;
+        return dataSource.getHikariPoolMXBean() == null ? 0 : dataSource.getHikariPoolMXBean().getIdleConnections();
+    }
+
+    public int hikariWaitingThreads() {
+        if (dataSource == null) return 0;
+        return dataSource.getHikariPoolMXBean() == null ? 0 : dataSource.getHikariPoolMXBean().getThreadsAwaitingConnection();
+    }
+
     public void shutdown() {
-        if (executor != null) executor.shutdown();
-        if (dataSource != null && !dataSource.isClosed()) dataSource.close();
+        acceptingOperations.set(false);
+        if (executor != null) {
+            executor.shutdown();
+            try {
+                if (!executor.awaitTermination(30, TimeUnit.SECONDS)) {
+                    executor.shutdownNow();
+                }
+            } catch (InterruptedException ex) {
+                executor.shutdownNow();
+                Thread.currentThread().interrupt();
+            }
+            executor = null;
+        }
+        if (dataSource != null && !dataSource.isClosed()) {
+            dataSource.close();
+            dataSource = null;
+        }
     }
 }

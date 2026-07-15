@@ -77,6 +77,7 @@ public final class CommandRegistrar {
         register("reportinvalid", reportsReview);
         register("lookup", new LookupCommand(services));
         register("staffnote", new StaffNoteCommand(services));
+        register("merankeddb", new DatabaseDebugCommand(services));
     }
 
     private void register(String name, CommandExecutor executor) {

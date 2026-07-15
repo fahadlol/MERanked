@@ -12,6 +12,8 @@ import java.security.MessageDigest;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Generates and verifies checksums for saved kits to detect tampering or illegal item injection.
@@ -20,7 +22,8 @@ public final class KitChecksumService {
 
     private final MERankedPlugin plugin;
     private final ServiceRegistry services;
-    private final java.util.Map<String, String> expectedCache = new java.util.concurrent.ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, String> expectedCache = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, CompletableFuture<String>> checksumLoads = new ConcurrentHashMap<>();
     private static final String NONE = "\u0000none";
 
     public KitChecksumService(MERankedPlugin plugin, ServiceRegistry services) {
@@ -58,7 +61,7 @@ public final class KitChecksumService {
         if (!enabled()) return;
         String checksum = compute(kit);
         expectedCache.put(key(uuid, gamemode), checksum);
-        services.database().executeAsync(conn -> {
+        services.database().executeAsync("storeKitChecksum", conn -> {
             int version = 1;
             try (PreparedStatement ps = conn.prepareStatement(
                     "SELECT version FROM ranked_kit_checksums WHERE uuid = ? AND gamemode = ?")) {
@@ -87,28 +90,18 @@ public final class KitChecksumService {
         if (!enabled()) return;
         String cacheKey = key(uuid, gamemode);
         if (expectedCache.containsKey(cacheKey)) return;
-        services.database().executeAsync(conn -> {
-            String checksum = null;
-            try (PreparedStatement ps = conn.prepareStatement(
-                    "SELECT checksum FROM ranked_kit_checksums WHERE uuid = ? AND gamemode = ?")) {
-                ps.setString(1, uuid.toString());
-                ps.setString(2, gamemode);
-                try (ResultSet rs = ps.executeQuery()) {
-                    if (rs.next()) checksum = rs.getString("checksum");
-                }
-            }
-            expectedCache.put(cacheKey, checksum == null ? NONE : checksum);
-        });
+        loadChecksumAsync(uuid, gamemode);
     }
 
     /** Returns true if the kit is valid (matches stored checksum or none stored yet). */
     public boolean verify(UUID uuid, String gamemode, KitService.StoredKit kit) {
         if (!enabled()) return true;
-        String expected = expectedCache.computeIfAbsent(key(uuid, gamemode), k -> {
-            String c = loadChecksum(uuid, gamemode);
-            return c == null ? NONE : c;
-        });
-        if (NONE.equals(expected)) return true; // no baseline yet
+        String expected = expectedCache.get(key(uuid, gamemode));
+        if (expected == null) {
+            loadChecksumAsync(uuid, gamemode);
+            return true;
+        }
+        if (NONE.equals(expected)) return true;
         String actual = compute(kit);
         if (expected.equals(actual)) return true;
 
@@ -127,8 +120,19 @@ public final class KitChecksumService {
         return !cfg.getBoolean("kit-checksum.block-on-mismatch", true);
     }
 
-    private String loadChecksum(UUID uuid, String gamemode) {
-        return services.database().queryAsync(conn -> {
+    private CompletableFuture<String> loadChecksumAsync(UUID uuid, String gamemode) {
+        String cacheKey = key(uuid, gamemode);
+        String cached = expectedCache.get(cacheKey);
+        if (cached != null) return CompletableFuture.completedFuture(cached);
+
+        CompletableFuture<String> existing = checksumLoads.get(cacheKey);
+        if (existing != null) return existing;
+
+        CompletableFuture<String> created = new CompletableFuture<>();
+        CompletableFuture<String> prior = checksumLoads.putIfAbsent(cacheKey, created);
+        if (prior != null) return prior;
+
+        services.database().queryAsync("loadKitChecksum", conn -> {
             try (PreparedStatement ps = conn.prepareStatement(
                     "SELECT checksum FROM ranked_kit_checksums WHERE uuid = ? AND gamemode = ?")) {
                 ps.setString(1, uuid.toString());
@@ -138,6 +142,16 @@ public final class KitChecksumService {
                 }
             }
             return null;
-        }).join();
+        }).whenComplete((checksum, error) -> {
+            checksumLoads.remove(cacheKey);
+            String resolved = checksum == null ? NONE : checksum;
+            if (error != null) {
+                plugin.getLogger().warning("Failed to load kit checksum for " + uuid + " (" + gamemode + "): "
+                        + error.getMessage());
+            }
+            expectedCache.put(cacheKey, resolved);
+            created.complete(resolved);
+        });
+        return created;
     }
 }

@@ -5,6 +5,8 @@ import com.meranked.config.ConfigService;
 import com.meranked.database.DatabaseService;
 import com.meranked.model.RankedPlayer;
 import com.meranked.model.RankedProfile;
+import com.meranked.util.DatabaseThreading;
+import org.bukkit.Bukkit;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
 
@@ -15,6 +17,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 
 public final class ProfileService {
@@ -25,9 +28,12 @@ public final class ProfileService {
     private final TierService tierService;
     private final RatingService ratingService;
     private final SeasonService seasonService;
+    private final DatabaseThreading threading;
 
     private final Map<UUID, RankedPlayer> playerCache = new ConcurrentHashMap<>();
     private final Map<String, RankedProfile> profileCache = new ConcurrentHashMap<>();
+    private final Map<UUID, CompletableFuture<RankedPlayer>> playerLoads = new ConcurrentHashMap<>();
+    private final Map<String, CompletableFuture<RankedProfile>> profileLoads = new ConcurrentHashMap<>();
     private final List<RankedProfile> pendingWrites = new java.util.concurrent.CopyOnWriteArrayList<>();
 
     public ProfileService(MERankedPlugin plugin, DatabaseService database, ConfigService configService,
@@ -38,63 +44,160 @@ public final class ProfileService {
         this.tierService = tierService;
         this.ratingService = ratingService;
         this.seasonService = seasonService;
+        this.threading = new DatabaseThreading(plugin);
     }
 
-    public RankedProfile getProfile(UUID uuid, String gamemode) {
-        String key = cacheKey(uuid, gamemode);
-        return profileCache.computeIfAbsent(key, k -> loadProfileSync(uuid, gamemode));
+    public RankedProfile getCachedProfile(UUID uuid, String gamemode) {
+        return profileCache.get(cacheKey(uuid, gamemode));
     }
 
-    public RankedPlayer getPlayer(UUID uuid) {
-        return playerCache.computeIfAbsent(uuid, this::loadPlayerSync);
-    }
-
-    public void ensurePlayer(Player player) {
-        UUID uuid = player.getUniqueId();
-        String name = player.getName();
-        if (!playerCache.containsKey(uuid)) {
-            RankedPlayer rp = loadPlayerSync(uuid);
-            if (rp == null) {
-                rp = RankedPlayer.create(uuid, name);
-                savePlayerAsync(rp);
-            }
-            playerCache.put(uuid, rp);
-        }
-        FileConfiguration gamemodes = configService.get("gamemodes.yml");
-        var section = gamemodes.getConfigurationSection("gamemodes");
-        if (section != null) {
-            for (String mode : section.getKeys(false)) {
-                getProfile(uuid, mode);
-            }
-        }
+    public RankedPlayer getCachedPlayer(UUID uuid) {
+        return playerCache.get(uuid);
     }
 
     /**
-     * Loads the player record and all gamemode profiles off the main thread, then populates the cache.
-     * Used on join to avoid a burst of blocking DB queries when many players connect at once.
+     * Returns a cached profile when available. When not cached, triggers a deduplicated async load and
+     * returns a non-cached default placeholder (safe for display only — never persisted).
+     */
+    public RankedProfile getProfile(UUID uuid, String gamemode) {
+        RankedProfile cached = getCachedProfile(uuid, gamemode);
+        if (cached != null) return cached;
+        loadProfileAsync(uuid, gamemode);
+        return defaultProfile(uuid, gamemode);
+    }
+
+    public RankedPlayer getPlayer(UUID uuid) {
+        RankedPlayer cached = getCachedPlayer(uuid);
+        if (cached != null) return cached;
+        loadPlayerAsync(uuid);
+        return defaultPlayer(uuid);
+    }
+
+    public CompletableFuture<RankedProfile> getProfileAsync(UUID uuid, String gamemode) {
+        RankedProfile cached = getCachedProfile(uuid, gamemode);
+        if (cached != null) return CompletableFuture.completedFuture(cached);
+        return loadProfileAsync(uuid, gamemode);
+    }
+
+    public CompletableFuture<RankedPlayer> getPlayerAsync(UUID uuid) {
+        RankedPlayer cached = getCachedPlayer(uuid);
+        if (cached != null) return CompletableFuture.completedFuture(cached);
+        return loadPlayerAsync(uuid);
+    }
+
+    public CompletableFuture<RankedProfile> loadProfileAsync(UUID uuid, String gamemode) {
+        String key = cacheKey(uuid, gamemode);
+        RankedProfile cached = profileCache.get(key);
+        if (cached != null) return CompletableFuture.completedFuture(cached);
+
+        CompletableFuture<RankedProfile> existing = profileLoads.get(key);
+        if (existing != null) return existing;
+
+        CompletableFuture<RankedProfile> created = new CompletableFuture<>();
+        CompletableFuture<RankedProfile> prior = profileLoads.putIfAbsent(key, created);
+        if (prior != null) return prior;
+
+        database.queryAsync("loadProfile", conn -> queryProfile(conn, uuid, gamemode))
+                .whenComplete((profile, error) -> {
+                    profileLoads.remove(key);
+                    if (error != null) {
+                        plugin.getLogger().warning("Failed to load profile for " + uuid + " (" + gamemode + "): "
+                                + error.getMessage());
+                        RankedProfile fallback = defaultProfile(uuid, gamemode);
+                        profileCache.put(key, fallback);
+                        created.complete(fallback);
+                        return;
+                    }
+                    if (profile == null) {
+                        RankedProfile createdProfile = defaultProfile(uuid, gamemode);
+                        createdProfile.setSeasonId(seasonService.currentSeasonId());
+                        profileCache.put(key, createdProfile);
+                        queueSave(createdProfile);
+                        created.complete(createdProfile);
+                    } else {
+                        profileCache.put(key, profile);
+                        created.complete(profile);
+                    }
+                });
+        return created;
+    }
+
+    public CompletableFuture<RankedPlayer> loadPlayerAsync(UUID uuid) {
+        RankedPlayer cached = playerCache.get(uuid);
+        if (cached != null) return CompletableFuture.completedFuture(cached);
+
+        CompletableFuture<RankedPlayer> existing = playerLoads.get(uuid);
+        if (existing != null) return existing;
+
+        CompletableFuture<RankedPlayer> created = new CompletableFuture<>();
+        CompletableFuture<RankedPlayer> prior = playerLoads.putIfAbsent(uuid, created);
+        if (prior != null) return prior;
+
+        database.queryAsync("loadPlayer", conn -> queryPlayer(conn, uuid))
+                .whenComplete((player, error) -> {
+                    playerLoads.remove(uuid);
+                    if (error != null) {
+                        plugin.getLogger().warning("Failed to load player record for " + uuid + ": " + error.getMessage());
+                        RankedPlayer fallback = defaultPlayer(uuid);
+                        playerCache.put(uuid, fallback);
+                        created.complete(fallback);
+                        return;
+                    }
+                    if (player == null) {
+                        RankedPlayer newPlayer = defaultPlayer(uuid);
+                        playerCache.put(uuid, newPlayer);
+                        savePlayerAsync(newPlayer);
+                        created.complete(newPlayer);
+                    } else {
+                        playerCache.put(uuid, player);
+                        created.complete(player);
+                    }
+                });
+        return created;
+    }
+
+    public void ensurePlayer(Player player) {
+        preloadAsync(player.getUniqueId(), player.getName());
+    }
+
+    /**
+     * Starts asynchronous loading for the player record and all gamemode profiles without blocking login.
      */
     public void preloadAsync(UUID uuid, String name) {
-        plugin.tasks().runAsync(() -> {
-            if (!playerCache.containsKey(uuid)) {
-                RankedPlayer rp = loadPlayerSync(uuid);
-                if (rp == null) {
-                    rp = RankedPlayer.create(uuid, name);
-                    savePlayerAsync(rp);
-                }
-                playerCache.putIfAbsent(uuid, rp);
+        loadPlayerAsync(uuid).thenCompose(player -> {
+            if ("Unknown".equals(player.username()) && name != null) {
+                RankedPlayer named = new RankedPlayer(player.uuid(), name, player.region(),
+                        player.regionHidden(), player.suspicionScore(), player.createdAt(), player.lastSeen());
+                playerCache.put(uuid, named);
+                savePlayerAsync(named);
             }
-            FileConfiguration gamemodes = configService.get("gamemodes.yml");
-            var section = gamemodes.getConfigurationSection("gamemodes");
-            if (section != null) {
-                for (String mode : section.getKeys(false)) {
-                    profileCache.computeIfAbsent(cacheKey(uuid, mode), k -> loadProfileSync(uuid, mode));
-                }
+            List<CompletableFuture<RankedProfile>> futures = new ArrayList<>();
+            for (String mode : enabledGamemodes()) {
+                futures.add(loadProfileAsync(uuid, mode));
             }
+            return CompletableFuture.allOf(futures.toArray(CompletableFuture[]::new));
+        }).whenComplete((ignored, error) -> {
+            if (error != null) {
+                plugin.getLogger().warning("Profile preload failed for " + uuid + ": " + error.getMessage());
+            }
+            threading.runSync(() -> {
+                if (!plugin.isEnabled()) return;
+                Player online = Bukkit.getPlayer(uuid);
+                if (online == null || !online.isOnline()) return;
+                plugin.services().scoreboards().refreshPlayer(online);
+            });
         });
+    }
+
+    /** Frees in-flight load state for a player who left. Cached data is retained until after flush. */
+    public void clearInflight(UUID uuid) {
+        playerLoads.remove(uuid);
+        profileLoads.keySet().removeIf(k -> k.startsWith(uuid + ":"));
     }
 
     /** Frees cached data for a player who is no longer online (called on quit, after flush). */
     public void unloadPlayer(UUID uuid) {
+        clearInflight(uuid);
         playerCache.remove(uuid);
         profileCache.keySet().removeIf(k -> k.startsWith(uuid + ":"));
     }
@@ -106,7 +209,7 @@ public final class ProfileService {
         if (section != null) {
             for (String key : section.getKeys(false)) {
                 if (section.getBoolean(key + ".enabled", true) ||
-                        section.getConfigurationSection(key) != null && 
+                        section.getConfigurationSection(key) != null &&
                         gamemodes.getBoolean("gamemodes." + key + ".enabled", true)) {
                     modes.add(key);
                 }
@@ -140,11 +243,27 @@ public final class ProfileService {
         flushPendingWrites();
     }
 
+    public int cachedProfileCount() {
+        return profileCache.size();
+    }
+
+    public int cachedPlayerCount() {
+        return playerCache.size();
+    }
+
+    public int inflightProfileLoads() {
+        return profileLoads.size();
+    }
+
+    public int inflightPlayerLoads() {
+        return playerLoads.size();
+    }
+
     private void flushPendingWrites() {
         if (pendingWrites.isEmpty()) return;
         List<RankedProfile> batch = new ArrayList<>(pendingWrites);
         pendingWrites.clear();
-        database.executeAsync(conn -> {
+        database.executeAsync("flushProfiles", conn -> {
             try (PreparedStatement ps = conn.prepareStatement("""
                 INSERT OR REPLACE INTO ranked_profiles
                 (uuid, gamemode, rating, rating_deviation, volatility, tier, peak_rating, peak_tier,
@@ -190,43 +309,46 @@ public final class ProfileService {
         ps.setDouble(25, p.hiddenMmr());
     }
 
-    private RankedProfile loadProfileSync(UUID uuid, String gamemode) {
-        return database.queryAsync(conn -> {
-            try (PreparedStatement ps = conn.prepareStatement(
-                    "SELECT * FROM ranked_profiles WHERE uuid = ? AND gamemode = ?")) {
-                ps.setString(1, uuid.toString());
-                ps.setString(2, gamemode);
-                try (ResultSet rs = ps.executeQuery()) {
-                    if (rs.next()) return mapProfile(rs);
-                }
+    private RankedProfile queryProfile(java.sql.Connection conn, UUID uuid, String gamemode) throws SQLException {
+        try (PreparedStatement ps = conn.prepareStatement(
+                "SELECT * FROM ranked_profiles WHERE uuid = ? AND gamemode = ?")) {
+            ps.setString(1, uuid.toString());
+            ps.setString(2, gamemode);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) return mapProfile(rs);
             }
-            RankedProfile profile = new RankedProfile(uuid, gamemode);
-            profile.setSeasonId(seasonService.currentSeasonId());
-            queueSave(profile);
-            return profile;
-        }).join();
+        }
+        return null;
     }
 
-    private RankedPlayer loadPlayerSync(UUID uuid) {
-        return database.queryAsync(conn -> {
-            try (PreparedStatement ps = conn.prepareStatement("SELECT * FROM ranked_players WHERE uuid = ?")) {
-                ps.setString(1, uuid.toString());
-                try (ResultSet rs = ps.executeQuery()) {
-                    if (rs.next()) {
-                        return new RankedPlayer(
-                                uuid,
-                                rs.getString("username"),
-                                rs.getString("region"),
-                                rs.getBoolean("region_hidden"),
-                                rs.getInt("suspicion_score"),
-                                rs.getLong("created_at"),
-                                rs.getLong("last_seen")
-                        );
-                    }
+    private RankedPlayer queryPlayer(java.sql.Connection conn, UUID uuid) throws SQLException {
+        try (PreparedStatement ps = conn.prepareStatement("SELECT * FROM ranked_players WHERE uuid = ?")) {
+            ps.setString(1, uuid.toString());
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return new RankedPlayer(
+                            uuid,
+                            rs.getString("username"),
+                            rs.getString("region"),
+                            rs.getBoolean("region_hidden"),
+                            rs.getInt("suspicion_score"),
+                            rs.getLong("created_at"),
+                            rs.getLong("last_seen")
+                    );
                 }
             }
-            return null;
-        }).join();
+        }
+        return null;
+    }
+
+    private RankedProfile defaultProfile(UUID uuid, String gamemode) {
+        RankedProfile profile = new RankedProfile(uuid, gamemode);
+        profile.setSeasonId(seasonService.currentSeasonId());
+        return profile;
+    }
+
+    private RankedPlayer defaultPlayer(UUID uuid) {
+        return RankedPlayer.create(uuid, "Unknown");
     }
 
     private RankedProfile mapProfile(ResultSet rs) throws java.sql.SQLException {
@@ -261,7 +383,7 @@ public final class ProfileService {
 
     public void savePlayerAsync(RankedPlayer player) {
         playerCache.put(player.uuid(), player);
-        database.executeAsync(conn -> {
+        database.executeAsync("savePlayer", conn -> {
             try (PreparedStatement ps = conn.prepareStatement("""
                 INSERT OR REPLACE INTO ranked_players
                 (uuid, username, region, region_hidden, suspicion_score, created_at, last_seen)

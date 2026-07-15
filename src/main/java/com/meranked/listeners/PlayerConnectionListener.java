@@ -6,6 +6,8 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 
+import java.util.UUID;
+
 public final class PlayerConnectionListener implements Listener {
 
     private final ServiceRegistry services;
@@ -16,13 +18,16 @@ public final class PlayerConnectionListener implements Listener {
 
     @EventHandler
     public void onJoin(PlayerJoinEvent event) {
-        services.profiles().preloadAsync(event.getPlayer().getUniqueId(), event.getPlayer().getName());
+        UUID uuid = event.getPlayer().getUniqueId();
+        services.profiles().preloadAsync(uuid, event.getPlayer().getName());
+        services.antiDodge().preloadAsync(uuid);
+        services.settings().loadAsync(uuid);
         services.lobbyItems().giveLobbyItems(event.getPlayer());
     }
 
     @EventHandler
     public void onQuit(PlayerQuitEvent event) {
-        java.util.UUID uuid = event.getPlayer().getUniqueId();
+        UUID uuid = event.getPlayer().getUniqueId();
         if (services.kitEditor().isEditing(uuid)) {
             services.kitEditor().leaveEditor(event.getPlayer());
         }
@@ -32,6 +37,8 @@ public final class PlayerConnectionListener implements Listener {
         services.matches().handleDisconnect(event.getPlayer());
         services.scoreboards().remove(event.getPlayer());
         services.profiles().flushNow();
+        services.profiles().clearInflight(uuid);
+        services.kits().clearInflight(uuid);
         services.profiles().unloadPlayer(uuid);
     }
 }

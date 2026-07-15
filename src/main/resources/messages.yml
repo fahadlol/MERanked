@@ -77,6 +77,8 @@ cinematic:
 
 kit-editor:
   entered: "<prefix> <gray>Editing kit for <gamemode>...</gray>"
+  loading: "<prefix> <gray>Loading your kit...</gray>"
+  load-failed: "<prefix> <red>Could not load your kit. Try again in a moment.</red>"
   saved: "<prefix> <green>Kit saved for <gamemode>.</green>"
   reverted: "<prefix> <yellow>Changes reverted.</yellow>"
   left: "<prefix> <gray>Left kit editor.</gray>"

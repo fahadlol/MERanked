@@ -73,8 +73,8 @@ public final class PlaceholderBridge {
         if (params.startsWith("rank_")) {
             String gamemode = params.substring(5);
             if (!services.profiles().enabledGamemodes().contains(gamemode)) return "-";
-            RankedProfile p = services.profiles().getProfile(uuid, gamemode);
-            if (!p.ranked()) return "-";
+            RankedProfile p = services.profiles().getCachedProfile(uuid, gamemode);
+            if (p == null || !p.ranked()) return "-";
             int rank = services.leaderboard().getRankCached(uuid, gamemode);
             return rank <= 0 ? "-" : "#" + rank;
         }
@@ -114,8 +114,9 @@ public final class PlaceholderBridge {
         }
         if (params.equals("win_gain") || params.equals("loss_loss")) {
             return match.map(m -> {
-                RankedProfile self = services.profiles().getProfile(uuid, m.gamemode());
-                RankedProfile opp = services.profiles().getProfile(m.opponent(uuid), m.gamemode());
+                RankedProfile self = services.profiles().getCachedProfile(uuid, m.gamemode());
+                RankedProfile opp = services.profiles().getCachedProfile(m.opponent(uuid), m.gamemode());
+                if (self == null || opp == null) return "0";
                 RatingService.PotentialChange pot = services.rating().calculatePotential(self, opp);
                 return params.equals("win_gain") ? String.valueOf(pot.winGain()) : String.valueOf(pot.lossLoss());
             }).orElse("0");
@@ -125,6 +126,9 @@ public final class PlaceholderBridge {
 
     private Optional<RankedProfile> profile(UUID uuid, String gamemode) {
         if (!services.profiles().enabledGamemodes().contains(gamemode)) return Optional.empty();
-        return Optional.of(services.profiles().getProfile(uuid, gamemode));
+        RankedProfile cached = services.profiles().getCachedProfile(uuid, gamemode);
+        if (cached != null) return Optional.of(cached);
+        services.profiles().loadProfileAsync(uuid, gamemode);
+        return Optional.empty();
     }
 }

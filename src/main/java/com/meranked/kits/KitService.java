@@ -3,6 +3,7 @@ package com.meranked.kits;
 import com.meranked.MERankedPlugin;
 import com.meranked.config.ConfigService;
 import com.meranked.database.DatabaseService;
+import com.meranked.util.DatabaseThreading;
 import com.meranked.util.ItemSerializer;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
@@ -10,8 +11,10 @@ import org.bukkit.inventory.ItemStack;
 
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 
 public final class KitService {
@@ -19,13 +22,16 @@ public final class KitService {
     private final MERankedPlugin plugin;
     private final ConfigService configService;
     private final DatabaseService database;
+    private final DatabaseThreading threading;
     private final Map<String, StoredKit> cache = new ConcurrentHashMap<>();
+    private final Map<String, CompletableFuture<StoredKit>> kitLoads = new ConcurrentHashMap<>();
     private KitChecksumService checksumService;
 
     public KitService(MERankedPlugin plugin, ConfigService configService, DatabaseService database) {
         this.plugin = plugin;
         this.configService = configService;
         this.database = database;
+        this.threading = new DatabaseThreading(plugin);
     }
 
     public void bindChecksum(KitChecksumService checksumService) {
@@ -33,8 +39,19 @@ public final class KitService {
     }
 
     public void applyKit(Player player, String gamemode) {
-        StoredKit kit = getKit(player.getUniqueId(), gamemode);
-        // Kit checksum verification: block tampered kits, fall back to default.
+        StoredKit kit = getCachedKit(player.getUniqueId(), gamemode);
+        if (kit == null) {
+            getKitAsync(player.getUniqueId(), gamemode).thenAccept(loaded ->
+                    threading.runSync(() -> {
+                        if (!player.isOnline()) return;
+                        applyKitInternal(player, gamemode, loaded);
+                    }));
+            return;
+        }
+        applyKitInternal(player, gamemode, kit);
+    }
+
+    private void applyKitInternal(Player player, String gamemode, StoredKit kit) {
         if (checksumService != null && !checksumService.verify(player.getUniqueId(), gamemode, kit)) {
             plugin.getLogger().warning("Blocked tampered kit for " + player.getName() + " (" + gamemode + ")");
             kit = defaultKit(gamemode);
@@ -47,32 +64,74 @@ public final class KitService {
         }
     }
 
+    public StoredKit getCachedKit(UUID uuid, String gamemode) {
+        return cache.get(key(uuid, gamemode));
+    }
+
+    /**
+     * Returns a cached kit when available. When not cached, triggers async load and returns the default kit.
+     */
     public StoredKit getKit(UUID uuid, String gamemode) {
-        String key = uuid + ":" + gamemode;
-        return cache.computeIfAbsent(key, k -> loadKit(uuid, gamemode));
+        StoredKit cached = getCachedKit(uuid, gamemode);
+        if (cached != null) return cached;
+        getKitAsync(uuid, gamemode);
+        return defaultKit(gamemode);
+    }
+
+    public CompletableFuture<StoredKit> getKitAsync(UUID uuid, String gamemode) {
+        StoredKit cached = getCachedKit(uuid, gamemode);
+        if (cached != null) return CompletableFuture.completedFuture(cached);
+        return loadKitAsync(uuid, gamemode);
+    }
+
+    public CompletableFuture<StoredKit> loadKitAsync(UUID uuid, String gamemode) {
+        String cacheKey = key(uuid, gamemode);
+        StoredKit cached = cache.get(cacheKey);
+        if (cached != null) return CompletableFuture.completedFuture(cached);
+
+        CompletableFuture<StoredKit> existing = kitLoads.get(cacheKey);
+        if (existing != null) return existing;
+
+        CompletableFuture<StoredKit> created = new CompletableFuture<>();
+        CompletableFuture<StoredKit> prior = kitLoads.putIfAbsent(cacheKey, created);
+        if (prior != null) return prior;
+
+        database.queryAsync("loadKit", conn -> queryKit(conn, uuid, gamemode))
+                .whenComplete((kit, error) -> {
+                    kitLoads.remove(cacheKey);
+                    StoredKit resolved = kit == null ? defaultKit(gamemode) : kit;
+                    if (error != null) {
+                        plugin.getLogger().warning("Failed to load kit for " + uuid + " (" + gamemode + "): "
+                                + error.getMessage());
+                    }
+                    cache.put(cacheKey, resolved);
+                    created.complete(resolved);
+                });
+        return created;
     }
 
     /**
      * Warms the kit + checksum caches off the main thread. Called when a match is found so the kit is
-     * ready in memory by the time players are teleported (avoids blocking DB reads at match start).
+     * ready in memory by the time players are teleported.
      */
     public void preloadAsync(UUID uuid, String gamemode) {
-        String key = uuid + ":" + gamemode;
-        if (!cache.containsKey(key)) {
-            plugin.tasks().runAsync(() -> cache.computeIfAbsent(key, k -> loadKit(uuid, gamemode)));
-        }
+        loadKitAsync(uuid, gamemode);
         if (checksumService != null) checksumService.preloadAsync(uuid, gamemode);
+    }
+
+    public void clearInflight(UUID uuid) {
+        kitLoads.keySet().removeIf(k -> k.startsWith(uuid + ":"));
     }
 
     public void saveKit(UUID uuid, String gamemode, ItemStack[] inventory, ItemStack[] armor, ItemStack[] enderChest) {
         StoredKit kit = new StoredKit(inventory.clone(), armor.clone(),
                 enderChest == null ? new ItemStack[27] : enderChest.clone());
-        cache.put(uuid + ":" + gamemode, kit);
+        cache.put(key(uuid, gamemode), kit);
         if (checksumService != null) checksumService.store(uuid, gamemode, kit);
         String invData = ItemSerializer.toBase64(inventory);
         String armorData = ItemSerializer.toBase64(armor);
         String enderData = ItemSerializer.toBase64(kit.enderChest());
-        database.executeAsync(conn -> {
+        database.executeAsync("saveKit", conn -> {
             try (PreparedStatement ps = conn.prepareStatement("""
                 INSERT OR REPLACE INTO ranked_kits (uuid, gamemode, kit_data, ender_chest_data, updated_at)
                 VALUES (?, ?, ?, ?, ?)
@@ -95,13 +154,13 @@ public final class KitService {
     }
 
     public void copyKit(UUID from, UUID to, String gamemode) {
-        StoredKit kit = getKit(from, gamemode);
-        saveKit(to, gamemode, kit.inventory(), kit.armor(), kit.enderChest());
+        getKitAsync(from, gamemode).thenAccept(kit ->
+                saveKit(to, gamemode, kit.inventory(), kit.armor(), kit.enderChest()));
     }
 
     public void resetKit(UUID uuid, String gamemode) {
-        cache.remove(uuid + ":" + gamemode);
-        database.executeAsync(conn -> {
+        cache.remove(key(uuid, gamemode));
+        database.executeAsync("resetKit", conn -> {
             try (PreparedStatement ps = conn.prepareStatement("DELETE FROM ranked_kits WHERE uuid = ? AND gamemode = ?")) {
                 ps.setString(1, uuid.toString());
                 ps.setString(2, gamemode);
@@ -110,26 +169,24 @@ public final class KitService {
         });
     }
 
-    private StoredKit loadKit(UUID uuid, String gamemode) {
-        return database.queryAsync(conn -> {
-            try (PreparedStatement ps = conn.prepareStatement(
-                    "SELECT kit_data, ender_chest_data FROM ranked_kits WHERE uuid = ? AND gamemode = ?")) {
-                ps.setString(1, uuid.toString());
-                ps.setString(2, gamemode);
-                try (ResultSet rs = ps.executeQuery()) {
-                    if (rs.next()) {
-                        String kitData = rs.getString("kit_data");
-                        String enderData = rs.getString("ender_chest_data");
-                        String[] parts = kitData == null ? new String[0] : kitData.split("\\|\\|", 2);
-                        ItemStack[] inv = parts.length > 0 ? ItemSerializer.fromBase64(parts[0], 41) : new ItemStack[41];
-                        ItemStack[] armor = parts.length > 1 ? ItemSerializer.fromBase64(parts[1], 4) : new ItemStack[4];
-                        ItemStack[] ender = ItemSerializer.fromBase64(enderData, 27);
-                        return new StoredKit(inv, armor, ender);
-                    }
+    private StoredKit queryKit(java.sql.Connection conn, UUID uuid, String gamemode) throws SQLException {
+        try (PreparedStatement ps = conn.prepareStatement(
+                "SELECT kit_data, ender_chest_data FROM ranked_kits WHERE uuid = ? AND gamemode = ?")) {
+            ps.setString(1, uuid.toString());
+            ps.setString(2, gamemode);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    String kitData = rs.getString("kit_data");
+                    String enderData = rs.getString("ender_chest_data");
+                    String[] parts = kitData == null ? new String[0] : kitData.split("\\|\\|", 2);
+                    ItemStack[] inv = parts.length > 0 ? ItemSerializer.fromBase64(parts[0], 41) : new ItemStack[41];
+                    ItemStack[] armor = parts.length > 1 ? ItemSerializer.fromBase64(parts[1], 4) : new ItemStack[4];
+                    ItemStack[] ender = ItemSerializer.fromBase64(enderData, 27);
+                    return new StoredKit(inv, armor, ender);
                 }
             }
-            return defaultKit(gamemode);
-        }).join();
+        }
+        return null;
     }
 
     private StoredKit defaultKit(String gamemode) {
@@ -166,6 +223,19 @@ public final class KitService {
 
     public void reloadDefaults() {
         cache.clear();
+        kitLoads.clear();
+    }
+
+    public int cachedKitCount() {
+        return cache.size();
+    }
+
+    public int inflightKitLoads() {
+        return kitLoads.size();
+    }
+
+    private static String key(UUID uuid, String gamemode) {
+        return uuid + ":" + gamemode;
     }
 
     public record StoredKit(ItemStack[] inventory, ItemStack[] armor, ItemStack[] enderChest) {}
